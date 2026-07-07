@@ -46,19 +46,25 @@
    another rule gives them display:flex/grid. */
 [hidden] { display: none !important; }
 
+html { scroll-behavior: smooth; }
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16.5px;              /* comfortable base — no tiny UI text */
   background: var(--bg);
   color: var(--ink);
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 main {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 0 24px 56px;
+  padding: 0 24px 80px;
 }
+
+/* Re-applied by script.js on every mode switch to fade the workspace in */
+.fade-in { animation: rise 0.25s ease both; }
 
 /* ------------------------------------------------------------
    Site header — dark green brand bar
@@ -137,10 +143,12 @@ main {
    Hero
    ------------------------------------------------------------ */
 .hero {
-  max-width: 860px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: 56px 24px 36px;
+  padding: 72px 24px 48px;
   text-align: center;
+  /* Very subtle green tint radiating from the header */
+  background: radial-gradient(ellipse 90% 70% at 50% 0%, rgba(27, 87, 65, 0.05), transparent);
 }
 
 .hero-eyebrow {
@@ -181,8 +189,8 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 16px 18px;
-  margin-bottom: 18px;
+  padding: 20px 22px;
+  margin-bottom: 22px;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -222,13 +230,13 @@ main {
   border: 1px solid var(--line);
   background: #fff;
   color: var(--ink);
-  padding: 9px 16px;
-  border-radius: 10px;
-  font-size: 0.9rem;
+  padding: 11px 18px;
+  border-radius: 12px;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease,
-              transform 0.12s ease, box-shadow 0.2s ease;
+              transform 0.15s ease, box-shadow 0.2s ease;
 }
 
 .btn:hover {
@@ -306,7 +314,7 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 14px;
+  padding: 18px;
 }
 
 .table-wrap { overflow-x: auto; }   /* horizontal scroll on small screens */
@@ -320,7 +328,7 @@ table {
 }
 
 th, td {
-  padding: 10px 12px;
+  padding: 12px 14px;
   text-align: left;
   min-width: 92px;
   border-radius: var(--radius-sm);
@@ -405,6 +413,13 @@ tbody td {
   box-shadow: inset 0 0 0 2px var(--grad-a);
   font-weight: 700;
   color: var(--grad-a);
+  animation: pop 0.25s ease;   /* gentle settle when a cell is chosen */
+}
+
+@keyframes pop {
+  0%   { transform: scale(0.94); }
+  60%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
 }
 
 /* ------------------------------------------------------------
@@ -474,7 +489,7 @@ tbody td {
    Generated idea — polished report card
    ------------------------------------------------------------ */
 .idea-output {
-  margin-top: 22px;
+  margin-top: 30px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -501,12 +516,17 @@ tbody td {
 }
 
 .idea-output h3 {
-  margin: 20px 0 4px;
-  font-size: 0.76rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 5px;
+  font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--green-700);
 }
+
+.section-icon { font-size: 1.05rem; }
 
 .idea-output p { margin: 0; }
 

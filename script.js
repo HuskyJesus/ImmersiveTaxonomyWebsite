@@ -183,7 +183,7 @@ function renderTable() {
         td.className = "selectable";
         const key = `${rowIndex}:${colIndex}`;
         if (selectedCells.has(key)) td.classList.add("is-selected");
-        td.addEventListener("click", () => toggleCell(key));
+        td.addEventListener("click", () => toggleCell(key, td));
       }
 
       tr.append(td);
@@ -367,13 +367,17 @@ function resetToDefault() {
 /* ------------------------------------------------------------
    7. DESIGN IDEAS MODE ACTIONS
    ------------------------------------------------------------ */
-function toggleCell(key) {
+/* Toggles one cell in place (no full re-render) so the selection
+   animation only plays on the cell that was actually clicked. */
+function toggleCell(key, td) {
   if (selectedCells.has(key)) {
     selectedCells.delete(key);
+    td.classList.remove("is-selected");
   } else {
     selectedCells.add(key);
+    td.classList.add("is-selected");
   }
-  renderTable();
+  updateSelectionSummary();
 }
 
 /* Picks a handful of random non-empty cells (3–5) */
@@ -610,7 +614,16 @@ function generateIdea() {
   const interaction = `Interaction centers on ${interactivity}, with ${dynamics} dynamics guiding how the experience unfolds. Engagement is sustained through ${motivation}.`;
 
   /* ----- Environment / setting ----- */
-  const environment = `The experience is delivered through ${tech}, framed by ${story} story structure that gives participants a sense of place and purpose.`;
+  const environment = pick([
+    `Framed by ${story} story structure, the world of ${topic} becomes a place participants move through — with a clear sense of where they are and why it matters.`,
+    `The setting wraps participants in ${topic}, using ${story} story structure to give every space a purpose and every moment a sense of place.`
+  ]);
+
+  /* ----- Technology ----- */
+  const technology = pick([
+    `Delivered through ${tech}. The technology stays in service of the experience — creating presence rather than drawing attention to itself.`,
+    `${capitalize(tech)} carries the experience, chosen so the delivery amplifies immersion instead of distracting from ${topic}.`
+  ]);
 
   /* ----- Learning / emotional goal ----- */
   const goal = pick([
@@ -642,18 +655,23 @@ function generateIdea() {
     `Try shifting one taxonomy dimension (for example, a different Tech or Story element) and compare how the experience changes.`
   ]);
 
-  /* ----- Render the report card ----- */
+  /* ----- Render the report card -----
+     Small helper keeps each section consistent: icon + label + body. */
+  const section = (icon, label, bodyHTML) =>
+    `<h3><span class="section-icon" aria-hidden="true">${icon}</span>${label}</h3>${bodyHTML}`;
+
   const output = $("idea-output");
   output.innerHTML = `
     <div class="recipe-chips">${chips}</div>
     <h2>${escapeHTML(title)}</h2>
-    <h3>Core Concept</h3><p>${escapeHTML(concept)}</p>
-    <h3>Audience &amp; Player Role</h3><p>${escapeHTML(role)}</p>
-    <h3>Interaction Style</h3><p>${escapeHTML(interaction)}</p>
-    <h3>Environment &amp; Setting</h3><p>${escapeHTML(environment)}</p>
-    <h3>Learning &amp; Emotional Goal</h3><p>${escapeHTML(goal)}</p>
-    <h3>Why These Taxonomy Elements Fit</h3><ul>${whyItems.join("")}</ul>
-    <h3>Optional Expansion</h3><p>${escapeHTML(expansion)}</p>
+    ${section("📋", "Summary", `<p>${escapeHTML(concept)}</p>`)}
+    ${section("👥", "Audience", `<p>${escapeHTML(role)}</p>`)}
+    ${section("🌍", "Environment", `<p>${escapeHTML(environment)}</p>`)}
+    ${section("🕹️", "Interaction", `<p>${escapeHTML(interaction)}</p>`)}
+    ${section("🎯", "Learning Goal", `<p>${escapeHTML(goal)}</p>`)}
+    ${section("🥽", "Technology", `<p>${escapeHTML(technology)}</p>`)}
+    ${section("🧩", "Design Rationale", `<ul>${whyItems.join("")}</ul>`)}
+    ${section("🚀", "Optional Expansion", `<p>${escapeHTML(expansion)}</p>`)}
   `;
   output.hidden = false;
   output.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -708,6 +726,12 @@ function setMode(newMode) {
   } else {
     renderTable();
   }
+
+  // Gentle fade-in of the workspace content on every mode switch
+  const activeView = mode === "inspire" ? $("recipe-board") : $("table-container");
+  activeView.classList.remove("fade-in");
+  void activeView.offsetWidth;   // forces a reflow so the animation restarts
+  activeView.classList.add("fade-in");
 }
 
 function init() {

@@ -26,7 +26,7 @@ The framework becomes selectable:
 
 - **Click cells** to select design elements (they highlight).
 - **Topic box** — enter any subject: "cooking", "video games", "creative writing within non-fiction", "history of the Civil War"…
-- **✨ Generate Experience Idea** — combines your topic with the selected elements into a full concept: title, core concept, audience/player role, interaction style, environment, learning/emotional goal, why each element fits (naming both the dimension and the value), and an optional expansion idea.
+- **✨ Generate Experience Idea** — combines your topic with the selected elements into a full report card: Experience Title, Summary, Audience, Environment, Interaction, Learning Goal, Technology, Design Rationale (naming both the dimension and the value for every chosen element), and an Optional Expansion idea.
 - **🎲 Generate From Random Path** — selects one cell from *every* column and generates immediately.
 - **Randomize Selection / Clear Selection** — quick ways to reset the board.
 
