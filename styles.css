@@ -1,0 +1,556 @@
+/* ============================================================
+   Immersive Experience Design Taxonomy — styles.css
+
+   Visual direction: modern education/technology aesthetic —
+   deep green branding, off-white content areas, rounded cards,
+   soft shadows, and occasional blue/purple gradient highlights.
+
+   All colors and shared sizes live in the CSS variables below,
+   so the whole theme can be tuned in one place.
+   ============================================================ */
+
+:root {
+  /* Brand greens (header, footer, accents) */
+  --green-950: #0a1f19;
+  --green-900: #0f2e25;
+  --green-800: #14402f;
+  --green-700: #1b5741;
+  --green-100: #ddefe6;
+
+  /* Content surfaces */
+  --bg: #f6f5f1;            /* off-white page background */
+  --surface: #ffffff;       /* cards */
+  --cell: #f1f3ee;          /* taxonomy cell chips */
+  --ink: #17241f;           /* main text */
+  --ink-soft: #5c6b64;      /* secondary text */
+  --line: #e4e7e1;          /* hairline borders */
+
+  /* Gradient highlight (blue → purple) used for primary actions */
+  --grad-a: #4f46e5;
+  --grad-b: #9333ea;
+  --gradient: linear-gradient(135deg, var(--grad-a), var(--grad-b));
+  --grad-soft: linear-gradient(135deg, #eef2ff, #f6efff);
+
+  --danger: #c0392b;
+
+  /* Shape + shadow */
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(16, 32, 25, 0.06), 0 8px 24px rgba(16, 32, 25, 0.07);
+  --shadow-lift: 0 2px 4px rgba(16, 32, 25, 0.08), 0 12px 32px rgba(16, 32, 25, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+/* Elements with the `hidden` attribute must stay hidden even when
+   another rule gives them display:flex/grid. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+main {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px 56px;
+}
+
+/* ------------------------------------------------------------
+   Site header — dark green brand bar
+   ------------------------------------------------------------ */
+.site-header {
+  background: linear-gradient(120deg, var(--green-950), var(--green-800));
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 2px 12px rgba(10, 31, 25, 0.35);
+}
+
+.header-inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Small round monogram, a nod to clean studio branding */
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--gradient);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.brand-name { font-size: 1.02rem; }
+
+/* Mode switcher — segmented pill on the dark header */
+.mode-toggle {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.mode-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--green-100);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.mode-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+.mode-btn.is-active {
+  background: #fff;
+  color: var(--green-800);
+}
+
+/* ------------------------------------------------------------
+   Hero
+   ------------------------------------------------------------ */
+.hero {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 56px 24px 36px;
+  text-align: center;
+}
+
+.hero-eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--green-700);
+}
+
+.hero h1 {
+  margin: 0 0 14px;
+  font-size: clamp(1.9rem, 4.5vw, 2.8rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+/* Blue→purple gradient text highlight */
+.gradient-text {
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-sub {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+}
+
+/* ------------------------------------------------------------
+   Panels (mode toolbars)
+   ------------------------------------------------------------ */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  animation: rise 0.3s ease both;   /* soft entrance on mode switch */
+}
+
+.panel-stack { flex-direction: column; align-items: stretch; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.panel-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.mode-hint {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  margin: 0 0 12px 6px;
+}
+
+/* ------------------------------------------------------------
+   Buttons
+   ------------------------------------------------------------ */
+.btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease,
+              transform 0.12s ease, box-shadow 0.2s ease;
+}
+
+.btn:hover {
+  border-color: var(--green-700);
+  background: var(--green-100);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.btn:active { transform: translateY(0) scale(0.97); }
+
+/* Primary — blue/purple gradient */
+.btn-primary {
+  background: var(--gradient);
+  border-color: transparent;
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--gradient);
+  color: #fff;
+  filter: brightness(1.08);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Brand — deep green */
+.btn-brand {
+  background: var(--green-800);
+  border-color: var(--green-800);
+  color: #fff;
+}
+.btn-brand:hover { background: var(--green-700); color: #fff; }
+
+.btn-danger { color: var(--danger); }
+.btn-danger:hover { background: #fdecea; border-color: var(--danger); }
+
+/* "Saved ✓" feedback text next to the Save button */
+.save-status {
+  color: var(--green-700);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Topic input */
+.topic-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topic-label { font-weight: 700; font-size: 0.9rem; }
+
+#topic-input {
+  flex: 1;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#topic-input:focus {
+  outline: none;
+  border-color: var(--grad-a);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
+
+/* ------------------------------------------------------------
+   The workspace — taxonomy grid
+   Cells are rounded chips with spacing between them, so the
+   framework reads as a card grid rather than a spreadsheet.
+   ------------------------------------------------------------ */
+.workspace {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+
+.table-wrap { overflow-x: auto; }   /* horizontal scroll on small screens */
+
+table {
+  border-collapse: separate;
+  border-spacing: 6px;
+  width: 100%;
+  min-width: 980px;                 /* keeps 10 columns readable; wrapper scrolls */
+  font-size: 0.88rem;
+}
+
+th, td {
+  padding: 10px 12px;
+  text-align: left;
+  min-width: 92px;
+  border-radius: var(--radius-sm);
+}
+
+/* Column headers — deep green chips */
+thead th {
+  background: var(--green-800);
+  color: var(--green-100);
+  font-weight: 700;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Body cells — soft chips */
+tbody td {
+  background: var(--cell);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+/* --- Edit Mode --- */
+[contenteditable="true"] {
+  outline: none;
+  cursor: text;
+  min-height: 1em;
+}
+
+[contenteditable="true"]:focus {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px var(--grad-a);
+}
+
+/* Small × buttons for deleting a row/column */
+.delete-btn {
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.delete-btn:hover { opacity: 1; background: #fdecea; color: var(--danger); }
+
+/* Header cells hold the editable name plus the delete button */
+.header-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.header-name { flex: 1; }
+
+/* Narrow trailing column that holds row-delete buttons */
+.row-tools {
+  width: 38px;
+  min-width: 38px;
+  text-align: center;
+  background: transparent !important;
+}
+
+/* --- Design Ideas Mode --- */
+.selectable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.selectable:hover {
+  background: var(--grad-soft);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.selectable.is-selected {
+  background: var(--grad-soft);
+  box-shadow: inset 0 0 0 2px var(--grad-a);
+  font-weight: 700;
+  color: var(--grad-a);
+}
+
+/* ------------------------------------------------------------
+   Inspiration Mode — the recipe board
+   One card per taxonomy column, each holding a randomly chosen
+   value with reroll + lock controls.
+   ------------------------------------------------------------ */
+.recipe-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.recipe-card {
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: rise 0.3s ease both;
+  transition: box-shadow 0.2s ease, transform 0.12s ease, background 0.2s ease;
+}
+
+.recipe-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+
+/* Locked cards get a green treatment so they stand out */
+.recipe-card.is-locked {
+  background: var(--green-100);
+  border-color: var(--green-700);
+}
+
+.recipe-dimension {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green-700);
+}
+
+.recipe-value {
+  font-size: 1rem;
+  font-weight: 700;
+  min-height: 2.6em;   /* keeps cards even when values wrap */
+}
+
+.recipe-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.icon-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-btn:hover { border-color: var(--green-700); transform: translateY(-1px); }
+.icon-btn:active { transform: scale(0.94); }
+
+/* ------------------------------------------------------------
+   Generated idea — polished report card
+   ------------------------------------------------------------ */
+.idea-output {
+  margin-top: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  padding: 28px 32px;
+  animation: rise 0.35s ease both;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Gradient ribbon along the top edge of the report */
+.idea-output::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 5px;
+  background: var(--gradient);
+}
+
+.idea-output h2 {
+  margin: 4px 0 12px;
+  font-size: 1.5rem;
+  letter-spacing: -0.015em;
+}
+
+.idea-output h3 {
+  margin: 20px 0 4px;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green-700);
+}
+
+.idea-output p { margin: 0; }
+
+.idea-output ul { margin: 4px 0 0; padding-left: 20px; }
+.idea-output li { margin-bottom: 5px; }
+
+/* Row of "Column · Value" chips summarizing the recipe used */
+.recipe-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.chip {
+  background: var(--grad-soft);
+  border: 1px solid #ddd9f8;
+  color: var(--grad-a);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------
+   Footer
+   ------------------------------------------------------------ */
+.site-footer {
+  background: var(--green-950);
+  color: var(--green-100);
+  text-align: center;
+  padding: 26px 24px;
+  font-size: 0.82rem;
+}
+
+.site-footer p { margin: 4px 0; opacity: 0.85; }
+
+/* ------------------------------------------------------------
+   Responsiveness
+   ------------------------------------------------------------ */
+@media (max-width: 720px) {
+  .header-inner { justify-content: center; }
+  .hero { padding-top: 36px; }
+  .topic-row { flex-direction: column; align-items: stretch; }
+  th, td { padding: 8px 9px; }
+  .idea-output { padding: 22px 20px; }
+}

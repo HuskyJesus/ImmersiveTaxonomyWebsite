@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Immersive Experience Design Taxonomy</title>
+  <meta name="description" content="An interactive framework for designing immersive experiences — edit the taxonomy, select design dimensions, and generate experience concepts." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+       SITE HEADER — dark green brand bar with the mode switcher
+       ============================================================ -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">Ix</span>
+        <span class="brand-name">Immersive Taxonomy</span>
+      </div>
+
+      <!-- Mode switcher: exactly one mode is active at a time -->
+      <nav class="mode-toggle" aria-label="Mode">
+        <button id="edit-mode-btn" class="mode-btn is-active" type="button">✏️ Edit</button>
+        <button id="idea-mode-btn" class="mode-btn" type="button">💡 Design Ideas</button>
+        <button id="inspire-mode-btn" class="mode-btn" type="button">✨ Inspiration</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       HERO — explains what the taxonomy is
+       ============================================================ -->
+  <section class="hero">
+    <p class="hero-eyebrow">A design framework, not a spreadsheet</p>
+    <h1>Design immersive experiences, <span class="gradient-text">one dimension at a time</span></h1>
+    <p class="hero-sub">
+      Every column below is a design dimension of an immersive experience — from how participants
+      interact, to how the story unfolds, to the technology that delivers it. Edit the framework,
+      combine its elements, or let a random recipe spark your next idea.
+    </p>
+  </section>
+
+  <main>
+
+    <!-- ============================================================
+         EDIT MODE TOOLBAR (script.js shows/hides these panels)
+         ============================================================ -->
+    <section id="edit-tools" class="panel" aria-label="Edit tools">
+      <div class="toolbar-group">
+        <button id="add-row-btn" class="btn" type="button">+ Add Row</button>
+        <button id="add-col-btn" class="btn" type="button">+ Add Column</button>
+      </div>
+      <div class="toolbar-group">
+        <button id="save-btn" class="btn btn-brand" type="button">Save</button>
+        <button id="export-btn" class="btn" type="button">Export JSON</button>
+        <button id="import-btn" class="btn" type="button">Import JSON</button>
+        <!-- Hidden file picker used by the Import button -->
+        <input id="import-file" type="file" accept=".json,application/json" hidden />
+        <button id="reset-btn" class="btn btn-danger" type="button">Reset to Default</button>
+      </div>
+      <span id="save-status" class="save-status" role="status"></span>
+    </section>
+
+    <!-- ============================================================
+         DESIGN IDEAS MODE TOOLBAR
+         ============================================================ -->
+    <section id="idea-tools" class="panel panel-stack" aria-label="Design ideas tools" hidden>
+      <!-- The shared topic input is moved into this slot by script.js -->
+      <div id="idea-topic-slot"></div>
+      <div class="toolbar-group">
+        <button id="generate-btn" class="btn btn-primary" type="button">✨ Generate Experience Idea</button>
+        <button id="random-path-btn" class="btn btn-brand" type="button">🎲 Generate From Random Path</button>
+        <button id="randomize-btn" class="btn" type="button">Randomize Selection</button>
+        <button id="clear-btn" class="btn" type="button">Clear Selection</button>
+      </div>
+      <p id="selection-summary" class="panel-note"></p>
+    </section>
+
+    <!-- ============================================================
+         INSPIRATION MODE TOOLBAR
+         A complete random "recipe" — one value per column — with
+         per-column locks so favorites survive a reroll.
+         ============================================================ -->
+    <section id="inspire-tools" class="panel panel-stack" aria-label="Inspiration tools" hidden>
+      <div id="inspire-topic-slot"></div>
+      <div class="toolbar-group">
+        <button id="inspire-generate-btn" class="btn btn-primary" type="button">✨ Generate Experience Idea</button>
+        <button id="new-recipe-btn" class="btn btn-brand" type="button">🎲 New Recipe</button>
+      </div>
+      <p class="panel-note">
+        Each card below is one design dimension. 🔄 rerolls a single card, 🔓/🔒 locks it so
+        “New Recipe” keeps it. <span id="lock-summary"></span>
+      </p>
+    </section>
+
+    <!-- Shared topic input (script.js moves it into the active panel) -->
+    <div id="topic-row" class="topic-row" hidden>
+      <label for="topic-input" class="topic-label">Topic</label>
+      <input
+        id="topic-input"
+        type="text"
+        placeholder='Try “cooking,” “video games,” “creative writing within non-fiction,” or “history of the Civil War”'
+      />
+    </div>
+
+    <!-- Short hint that changes with the mode -->
+    <p id="mode-hint" class="mode-hint"></p>
+
+    <!-- ============================================================
+         THE WORKSPACE — the visual centerpiece.
+         Holds either the taxonomy grid (Edit / Design Ideas modes)
+         or the recipe board (Inspiration mode).
+         ============================================================ -->
+    <section class="workspace">
+      <div id="table-container" class="table-wrap"></div>
+      <div id="recipe-board" class="recipe-board" hidden></div>
+    </section>
+
+    <!-- Generated experience concept appears here as a report card -->
+    <section id="idea-output" class="idea-output" hidden></section>
+
+  </main>
+
+  <!-- ============================================================
+       FOOTER — version info
+       ============================================================ -->
+  <footer class="site-footer">
+    <p>Immersive Experience Design Taxonomy · v1.0</p>
+    <p>Runs entirely in your browser — no server, no account. Edits are saved locally via localStorage.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
