@@ -3,15 +3,17 @@
 
    How this file is organized:
      1. Default taxonomy data
-     2. App state (taxonomy, mode, selections, recipe, locks)
+     2. App state (taxonomy, mode, selections, locks, recipe)
      3. localStorage save/load
      4. Rendering — the taxonomy grid (Edit / Design Ideas modes)
      5. Rendering — the recipe board (Inspiration mode)
      6. Edit Mode actions (rows, columns, import/export, reset)
-     7. Design Ideas Mode actions (select, randomize, clear)
+     7. Design Ideas Mode actions (select, lock, randomize, clear)
      8. Inspiration Mode actions (new recipe, reroll, lock)
-     9. The idea generator (template-based — no API needed)
-    10. Mode switching + wiring everything up
+     9. The idea generator — knowledge maps
+    10. The idea generator — topic analysis
+    11. The idea generator — composing and rendering ideas
+    12. Mode switching + wiring everything up
 
    The taxonomy is stored as a plain object:
      { columns: ["Interactivity", ...], rows: [["Passive", ...], ...] }
@@ -47,8 +49,10 @@ const STORAGE_KEY = "immersive-taxonomy-v1";
 let taxonomy = loadTaxonomy();     // the current framework data
 let mode = "edit";                 // "edit" | "idea" | "inspire"
 let selectedCells = new Set();     // Design Ideas selections, as "row:col" strings
+let lockedSelection = new Set();   // subset of selections protected from Randomize
 let recipe = null;                 // Inspiration mode: array of row indexes, one per column (-1 = no value)
-let lockedColumns = new Set();     // column indexes that keep their value on "New Recipe"
+let lockedColumns = new Set();     // Inspiration mode: column indexes kept on "New Recipe"
+let lastGeneration = null;         // "spark" | "full" — what Regenerate should repeat
 
 /* Shortcut for grabbing elements by id */
 const $ = (id) => document.getElementById(id);
@@ -183,6 +187,7 @@ function renderTable() {
         td.className = "selectable";
         const key = `${rowIndex}:${colIndex}`;
         if (selectedCells.has(key)) td.classList.add("is-selected");
+        if (lockedSelection.has(key)) td.classList.add("is-locked-cell");
         td.addEventListener("click", () => toggleCell(key, td));
       }
 
@@ -211,20 +216,25 @@ function renderTable() {
   updateSelectionSummary();
 }
 
-/* Small line under the Design Ideas toolbar, e.g. "3 cells selected" */
+/* Status line + lock button label under the Design Ideas toolbar */
 function updateSelectionSummary() {
   const el = $("selection-summary");
   const count = selectedCells.size;
-  el.textContent =
+  const locked = lockedSelection.size;
+
+  let text =
     count === 0
       ? "No cells selected yet — click cells in the framework below, or use Randomize."
       : `${count} cell${count === 1 ? "" : "s"} selected.`;
+  if (locked > 0) text += ` ${locked} locked — Randomize fills only the unlocked dimensions.`;
+  el.textContent = text;
+
+  $("lock-selection-btn").textContent =
+    locked > 0 ? "🔓 Unlock Selection" : "🔒 Lock Selection";
 }
 
 /* ------------------------------------------------------------
    5. RENDERING — THE RECIPE BOARD (Inspiration Mode)
-   One card per column: the dimension name, the randomly chosen
-   value, a reroll button, and a lock toggle.
    ------------------------------------------------------------ */
 function renderRecipeBoard() {
   const board = $("recipe-board");
@@ -262,7 +272,7 @@ function renderRecipeBoard() {
     lock.className = "icon-btn";
     lock.title = locked ? `Unlock ${colName}` : `Lock ${colName}`;
     lock.textContent = locked ? "🔒" : "🔓";
-    lock.addEventListener("click", () => toggleLock(colIndex));
+    lock.addEventListener("click", () => toggleColumnLock(colIndex));
 
     actions.append(reroll, lock);
     card.append(dim, val, actions);
@@ -311,10 +321,11 @@ function deleteColumn(colIndex) {
   afterStructureChange();
 }
 
-/* When rows/columns change shape, old selections, recipes, and locks
+/* When rows/columns change shape, selections, locks, and recipes
    may point at cells that no longer exist — reset them all. */
 function afterStructureChange() {
   selectedCells.clear();
+  lockedSelection.clear();
   recipe = null;
   lockedColumns.clear();
   saveTaxonomy();
@@ -367,62 +378,20 @@ function resetToDefault() {
 /* ------------------------------------------------------------
    7. DESIGN IDEAS MODE ACTIONS
    ------------------------------------------------------------ */
+
 /* Toggles one cell in place (no full re-render) so the selection
    animation only plays on the cell that was actually clicked. */
 function toggleCell(key, td) {
   if (selectedCells.has(key)) {
     selectedCells.delete(key);
-    td.classList.remove("is-selected");
+    lockedSelection.delete(key);   // deselecting also unlocks it
+    td.classList.remove("is-selected", "is-locked-cell");
   } else {
     selectedCells.add(key);
     td.classList.add("is-selected");
   }
   updateSelectionSummary();
 }
-
-/* Picks a handful of random non-empty cells (3–5) */
-function randomizeSelection() {
-  selectedCells.clear();
-
-  const positions = [];
-  taxonomy.rows.forEach((row, r) =>
-    row.forEach((cell, c) => {
-      if (cell.trim() !== "") positions.push(`${r}:${c}`);
-    })
-  );
-
-  const howMany = Math.min(positions.length, 3 + Math.floor(Math.random() * 3)); // 3, 4, or 5
-  shuffle(positions);
-  positions.slice(0, howMany).forEach((key) => selectedCells.add(key));
-  renderTable();
-}
-
-/* Selects one cell from EVERY column — a complete design path —
-   then generates an idea from it right away. (For finer control,
-   Inspiration Mode does the same thing with per-column locks.) */
-function randomPath() {
-  selectedCells.clear();
-  taxonomy.columns.forEach((_, colIndex) => {
-    const candidates = rowsWithValue(colIndex);
-    if (candidates.length > 0) {
-      selectedCells.add(`${pick(candidates)}:${colIndex}`);
-    }
-  });
-  renderTable();
-  generateIdea();
-}
-
-function clearSelection() {
-  selectedCells.clear();
-  renderTable();
-  $("idea-output").hidden = true;
-}
-
-/* ------------------------------------------------------------
-   8. INSPIRATION MODE ACTIONS
-   A "recipe" holds one randomly chosen row index per column.
-   Locked columns survive a reroll.
-   ------------------------------------------------------------ */
 
 /* Row indexes that have a non-empty value in the given column */
 function rowsWithValue(colIndex) {
@@ -432,6 +401,88 @@ function rowsWithValue(colIndex) {
   });
   return candidates;
 }
+
+/* The first (top-most) locked cell in a column, or null */
+function lockedCellInColumn(colIndex) {
+  for (let r = 0; r < taxonomy.rows.length; r++) {
+    if (lockedSelection.has(`${r}:${colIndex}`)) return `${r}:${colIndex}`;
+  }
+  return null;
+}
+
+/* Lock Selection: protects the current selection from Randomize.
+   If a column has multiple selected cells, only the first is kept
+   (a recipe needs exactly one value per dimension). */
+function toggleSelectionLock() {
+  if (lockedSelection.size > 0) {
+    lockedSelection.clear();          // acting as "Unlock Selection"
+    renderTable();
+    return;
+  }
+  if (selectedCells.size === 0) {
+    alert("Select some cells first, then lock them.");
+    return;
+  }
+
+  let trimmed = 0;
+  taxonomy.columns.forEach((_, colIndex) => {
+    let keptOne = false;
+    for (let r = 0; r < taxonomy.rows.length; r++) {
+      const key = `${r}:${colIndex}`;
+      if (!selectedCells.has(key)) continue;
+      if (!keptOne) {
+        lockedSelection.add(key);     // first selected cell in this column wins
+        keptOne = true;
+      } else {
+        selectedCells.delete(key);    // extra cells in the same column are dropped
+        trimmed++;
+      }
+    }
+  });
+
+  renderTable();
+  if (trimmed > 0) {
+    $("selection-summary").textContent +=
+      ` (${trimmed} extra cell${trimmed === 1 ? "" : "s"} removed — a recipe keeps one value per dimension.)`;
+  }
+}
+
+/* Randomize Selection: builds a COMPLETE recipe — exactly one cell
+   per column. Locked cells keep their column; every other column
+   (with at least one usable value) gets one random cell. */
+function randomizeSelection() {
+  const next = new Set();
+  taxonomy.columns.forEach((_, colIndex) => {
+    const locked = lockedCellInColumn(colIndex);
+    if (locked) {
+      next.add(locked);               // locked column: keep the chosen cell
+      return;
+    }
+    const candidates = rowsWithValue(colIndex);
+    if (candidates.length > 0) next.add(`${pick(candidates)}:${colIndex}`);
+    // columns with no usable values are skipped — nothing to select
+  });
+  selectedCells = next;
+  renderTable();
+}
+
+/* Generate From Random Path: same complete-recipe fill (respecting
+   locks), then immediately generates a full experience. */
+function randomPath() {
+  randomizeSelection();
+  generateIdea("full");
+}
+
+function clearSelection() {
+  selectedCells.clear();
+  lockedSelection.clear();
+  renderTable();
+  $("idea-output").hidden = true;
+}
+
+/* ------------------------------------------------------------
+   8. INSPIRATION MODE ACTIONS
+   ------------------------------------------------------------ */
 
 /* Rolls a fresh recipe, keeping any locked columns as they are */
 function newRecipe() {
@@ -456,7 +507,7 @@ function rerollColumn(colIndex) {
   renderRecipeBoard();
 }
 
-function toggleLock(colIndex) {
+function toggleColumnLock(colIndex) {
   if (lockedColumns.has(colIndex)) {
     lockedColumns.delete(colIndex);
   } else {
@@ -466,38 +517,242 @@ function toggleLock(colIndex) {
 }
 
 /* ------------------------------------------------------------
-   9. THE IDEA GENERATOR
-   Template-based: it combines the topic with the chosen taxonomy
-   elements — grouped by column/dimension — into a readable design
-   concept. Runs entirely locally, no API.
+   9. THE IDEA GENERATOR — KNOWLEDGE MAPS
+   Each column plays a specific role in the design, and every
+   default value has a short interpretation. Custom columns and
+   values still work — they fall back to generic wording.
    ------------------------------------------------------------ */
 
-/* Plain-language meaning of each default dimension, used in the
-   "why it fits" section. Unknown (custom) columns get a fallback. */
-const COLUMN_MEANINGS = {
-  "Interactivity": "how participants act within the experience",
-  "Embodiment": "how participants are present in the world",
-  "Co-Participation": "how many people share the experience, and how",
-  "Story": "how the narrative is structured",
-  "Dynamics": "how much the experience adapts and responds",
-  "Motivation": "what keeps participants engaged",
-  "Meta Control": "how much participants can shape the world itself",
-  "Learning": "how knowledge is absorbed",
-  "Data": "how participant information shapes the experience",
-  "Tech": "the technology that delivers the experience"
+/* What each dimension controls in the design */
+const COLUMN_ROLES = {
+  "Interactivity": "what participants do",
+  "Embodiment": "how present participants feel",
+  "Co-Participation": "the social structure",
+  "Story": "the narrative structure",
+  "Dynamics": "agency and system behavior",
+  "Motivation": "why participants keep going",
+  "Meta Control": "whether participants shape the world and its rules",
+  "Learning": "how knowledge is delivered",
+  "Data": "personalization and tracking",
+  "Tech": "the platform assumptions"
 };
+
+/* What each specific value means for the design */
+const INTERPRETATIONS = {
+  "Interactivity": {
+    "Passive": "participants primarily observe as the experience unfolds around them",
+    "Interactive": "participants make simple choices that visibly change the moment",
+    "Problem Solving": "participants solve puzzles and challenges to move forward",
+    "Physicalized": "participants act through movement and embodied action",
+    "Interpersonal": "participants interact socially — other people are the core interface"
+  },
+  "Embodiment": {
+    "Detached": "participants view the world from outside it, like studying a living diorama",
+    "Observer": "participants stand inside the world but remain unseen by it",
+    "First Person POV": "participants inhabit the world through their own eyes",
+    "Movement Control": "participants' physical movement is tracked and mirrored in the world",
+    "Human to Human": "presence comes from real people responding to real people"
+  },
+  "Co-Participation": {
+    "Single Person": "a solo experience tuned for individual focus and pacing",
+    "One on One": "an intimate pairing — one participant with one partner or guide",
+    "Group": "a small group shares the experience and shapes it together",
+    "MMO": "many participants inhabit the same persistent world at once",
+    "Secondary Perspective": "some participants act while others watch and influence from a second vantage point"
+  },
+  "Story": {
+    "None": "no imposed narrative — meaning emerges from what participants do",
+    "Setting": "a rich setting implies a story without dictating one",
+    "Pre-created": "a crafted narrative carries participants from beginning to end",
+    "Choose your own": "branching paths let participants steer where the narrative goes",
+    "Adaptive Story": "the story quietly reshapes itself around participant behavior"
+  },
+  "Dynamics": {
+    "Predetermined": "events run on rails, giving the designer full control of pacing and reveals",
+    "Choice": "discrete decision points hand participants agency at key beats",
+    "Free Will": "participants act freely and the system responds to whatever they try",
+    "Conversational Reality": "the world negotiates with participants through open-ended dialogue",
+    "Adjustible POV": "participants can shift their point of view to see the system from new angles"
+  },
+  "Motivation": {
+    "None": "engagement rides on curiosity alone — no external incentives",
+    "Basic Mechanics": "simple, satisfying mechanics keep hands and minds engaged",
+    "Challenge": "difficulty itself is the draw, so mastery feels earned",
+    "Reinforcement": "steady feedback loops reward every bit of progress",
+    "Reward System": "explicit rewards give structure to long-term engagement"
+  },
+  "Meta Control": {
+    "None": "participants play within the world exactly as designed",
+    "Journey": "participants control their own path through the world, not the world itself",
+    "Character": "participants shape who they are within the world",
+    "World Editor": "participants can modify parts of the world as they go",
+    "World Builder": "participants construct the world itself — creation is the experience"
+  },
+  "Learning": {
+    "Elemental": "knowledge arrives in small foundational pieces that stack",
+    "Explicit": "learning goals are named openly and taught directly",
+    "Implicit": "learning happens through doing — absorbed rather than taught",
+    "Recall": "participants retrieve and apply what they already know",
+    "Sythensis": "participants combine ideas into something new of their own"
+  },
+  "Data": {
+    "Anonymous": "no participant data is kept — every session starts clean",
+    "Identity": "the experience knows who participants are and greets them accordingly",
+    "In-session": "behavior is tracked within a session so the experience adapts in the moment",
+    "Personalized": "a persistent profile tailors the experience across visits",
+    "Biometric": "physiological signals — heart rate, gaze, motion — tune the experience live"
+  },
+  "Tech": {
+    "none": "no technology at all — a fully physical, analog experience",
+    "2D": "a screen-based experience on ordinary displays",
+    "AR": "digital content overlaid onto the real world",
+    "VR": "a fully immersive simulated space",
+    "XR": "a mixed system spanning physical and digital space"
+  }
+};
+
+/* Look up the meaning of a value within its dimension, with a
+   graceful fallback for custom columns/values. */
+function interpret(col, value) {
+  const map = INTERPRETATIONS[col];
+  if (map && map[value]) return map[value];
+  const role = COLUMN_ROLES[col] || "a key aspect of the design";
+  return `“${value}” defines ${role}`;
+}
+
+/* ------------------------------------------------------------
+   10. THE IDEA GENERATOR — TOPIC ANALYSIS
+   A small keyword scan matches the topic to a domain profile so
+   generated ideas use vocabulary that fits the subject.
+   ------------------------------------------------------------ */
+const DOMAIN_PROFILES = [
+  {
+    keywords: ["cook", "food", "recipe", "kitchen", "bak", "cuisine", "chef", "meal", "taste", "dining"],
+    artifacts: ["ingredients", "recipes", "technique", "flavor pairings", "food traditions"],
+    actions: [
+      "prep and combine real ingredients",
+      "balance flavors against the clock",
+      "reverse-engineer a dish by taste",
+      "plate and present a finished dish",
+      "trace a recipe back through its food culture"
+    ],
+    place: "a working kitchen",
+    community: "fellow cooks",
+    payoff: "a dish they can actually make — and the confidence to improvise the next one"
+  },
+  {
+    keywords: ["game", "gaming", "esports", "arcade", "video"],
+    artifacts: ["mechanics", "levels", "progression systems", "genres", "player strategies"],
+    actions: [
+      "learn a system by playing it",
+      "take a level apart to see why it works",
+      "prototype a mechanic and watch players break it",
+      "iterate on a strategy against real opponents",
+      "trace how a genre evolved one design decision at a time"
+    ],
+    place: "a living game world",
+    community: "other players",
+    payoff: "a designer's eye — they stop just playing games and start reading them"
+  },
+  {
+    keywords: ["writ", "essay", "memoir", "non-fiction", "nonfiction", "journal", "poet", "author"],
+    artifacts: ["voice", "memory", "structure", "evidence", "perspective", "revision"],
+    actions: [
+      "gather raw material from real life",
+      "test the same true story in two different structures",
+      "revise a passage until the voice is unmistakably theirs",
+      "weigh evidence against memory",
+      "read their work aloud and feel where it lands"
+    ],
+    place: "a writer's room of drafts, sources, and voices",
+    community: "fellow writers and readers",
+    payoff: "a piece of true writing with a voice of its own"
+  },
+  {
+    keywords: ["history", "war", "civil", "ancient", "egypt", "rome", "greek", "revolution", "medieval", "century", "historical"],
+    artifacts: ["primary sources", "competing perspectives", "maps and geography", "pivotal decisions", "consequences"],
+    actions: [
+      "examine primary sources firsthand",
+      "stand inside a pivotal decision as it's being made",
+      "hear the same event told from opposing sides",
+      "trace causes forward into consequences",
+      "walk the actual geography where it happened"
+    ],
+    place: "a reconstructed historical moment",
+    community: "the people who lived it",
+    payoff: "history felt as lived experience rather than memorized dates"
+  },
+  {
+    keywords: ["science", "physic", "chem", "bio", "space", "astro", "math", "engineer", "nature", "climate"],
+    artifacts: ["experiments", "models", "data", "phenomena", "predictions"],
+    actions: [
+      "run an experiment and watch it disagree with them",
+      "build a model, then break it on purpose",
+      "predict first, observe second",
+      "scale the invisible up to human size",
+      "follow one measurement all the way to a conclusion"
+    ],
+    place: "a laboratory with no safety limits",
+    community: "fellow investigators",
+    payoff: "an intuition for how the system really behaves"
+  },
+  {
+    keywords: ["music", "art", "paint", "danc", "theat", "film", "design", "photo", "sculpt"],
+    artifacts: ["techniques", "styles", "materials", "compositions", "influences"],
+    actions: [
+      "study a master's choices from the inside",
+      "experiment with materials until something surprises them",
+      "compose, perform, and get an honest response",
+      "remix an established style into their own",
+      "watch one work change meaning in different contexts"
+    ],
+    place: "an open studio",
+    community: "fellow makers",
+    payoff: "a made thing that carries their own choices in it"
+  }
+];
+
+/* Used when the topic doesn't match any profile */
+const GENERIC_PROFILE = {
+  keywords: [],
+  artifacts: ["core ideas", "real examples", "open questions", "turning points"],
+  actions: [
+    "explore the territory at their own pace",
+    "test their understanding against real cases",
+    "piece together the big picture from fragments",
+    "apply what they find to a problem that matters"
+  ],
+  place: "a world built from the topic itself",
+  community: "fellow explorers",
+  payoff: "an understanding they built themselves"
+};
+
+/* Scans the topic for domain keywords and returns the best profile */
+function analyzeTopic(topic) {
+  const t = topic.toLowerCase();
+  for (const profile of DOMAIN_PROFILES) {
+    if (profile.keywords.some((k) => t.includes(k))) return profile;
+  }
+  return GENERIC_PROFILE;
+}
+
+/* ------------------------------------------------------------
+   11. THE IDEA GENERATOR — COMPOSING & RENDERING
+   ------------------------------------------------------------ */
 
 /* --- Small utilities --- */
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function shuffle(arr) {  // Fisher–Yates, in place
-  for (let i = arr.length - 1; i > 0; i--) {
+/* Picks n DIFFERENT items from an array (or fewer if it's short) */
+function pickSome(arr, n) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {   // Fisher–Yates shuffle
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
-  return arr;
+  return copy.slice(0, n);
 }
 
 function capitalize(text) {
@@ -519,7 +774,7 @@ function escapeHTML(text) {
 }
 
 /* Collects the chosen elements as { columnName: [values] } —
-   from the recipe in Inspiration mode, from clicked cells otherwise. */
+   from the recipe in Inspiration mode, from selected cells otherwise. */
 function buildGroups() {
   const groups = {};
 
@@ -545,19 +800,105 @@ function buildGroups() {
   return groups;
 }
 
-/* Some cell values (like "none") read badly inside sentences.
-   This filters them out for prose, while the "why" section still
-   lists every chosen element faithfully. */
+/* Values like "none" read badly inside prose; the rationale section
+   still lists every chosen element faithfully. */
 function proseValues(values = []) {
   return values.filter((v) => v.toLowerCase() !== "none");
 }
 
-function generateIdea() {
+/* Composes a complete idea object from the topic + chosen elements.
+   Every field mixes randomized sentence templates with the
+   interpretation maps, so regenerating gives fresh variations. */
+function composeIdea(topic, groups, profile) {
+  const columnNames = Object.keys(groups);
+  const allValues = proseValues(columnNames.flatMap((c) => groups[c]));
+  const signature = allValues.length > 0 ? pick(allValues) : "Immersive";
+
+  // First chosen value in a dimension (or null), and its interpretation
+  const v = (col) => (groups[col] || [])[0] || null;
+  const meaning = (col, fallback) => (v(col) ? interpret(col, v(col)) : fallback);
+
+  const [actionA, actionB] = pickSome(profile.actions, 2);
+
+  /* ----- Title & pitch ----- */
+  const title = pick([
+    `${capitalize(topic)}: The ${signature} Experience`,
+    `Inside ${capitalize(topic)}`,
+    `${capitalize(topic)}, ${pick(["Reimagined", "Unlocked", "Up Close", "From the Inside"])}`,
+    `The ${signature} ${capitalize(topic)} Project`
+  ]);
+
+  const pitch = pick([
+    `An immersive take on ${topic} where ${meaning("Interactivity", "participants explore freely")} — set in ${profile.place}, built around ${naturalJoin(pickSome(profile.artifacts, 2))}.`,
+    `${capitalize(profile.place)} becomes the classroom: an experience about ${topic} in which ${meaning("Interactivity", "participants set their own pace")}.`,
+    `A designed experience that turns ${topic} into a place — one where ${meaning("Embodiment", "participants feel genuinely present")} and ${naturalJoin(pickSome(profile.artifacts, 2))} are things you handle, not read about.`
+  ]);
+
+  /* ----- Audience / user role ----- */
+  const audience = `${capitalize(meaning("Co-Participation", "designed for solo or small-group participation"))}. ${capitalize(meaning("Embodiment", "participants are present through their own natural perspective"))} — cast as ${pick([
+    "curious newcomers",
+    "hands-on apprentices",
+    "investigators with a real question",
+    "co-creators with a stake in the outcome"
+  ])} among ${profile.community}.`;
+
+  /* ----- Experience flow (arrival → core → resolution) ----- */
+  const flow =
+    `Arrival: participants step into ${profile.place}${v("Story") ? ` — ${interpret("Story", v("Story"))}` : ""}. ` +
+    `The core: they ${actionA}, then ${actionB}, while ${meaning("Dynamics", "the experience responds to whatever they try")}. ` +
+    `Resolution: the session closes with ${profile.payoff}.`;
+
+  /* ----- Interaction model ----- */
+  const interaction = `${capitalize(meaning("Interactivity", "participants explore at their own pace"))}. In practice that means they ${actionA} — with ${meaning("Motivation", "curiosity as the only incentive")}.`;
+
+  /* ----- Immersion strategy ----- */
+  const immersion = `${capitalize(meaning("Embodiment", "presence comes from attention to detail rather than hardware"))}. ${capitalize(meaning("Meta Control", "the world stays in the designer's hands, so every moment can be tuned"))} — which keeps the immersion feeling ${pick(["earned", "personal", "alive", "coherent"])}.`;
+
+  /* ----- Learning / emotional goal ----- */
+  const goal = `${capitalize(meaning("Learning", "learning happens through doing"))}. The target: ${profile.payoff}. Emotionally, participants should leave feeling ${pick([
+    "capable and curious for more",
+    `personally connected to ${topic}`,
+    "like insiders rather than audience members",
+    "that they made something worth keeping"
+  ])}.`;
+
+  /* ----- Data / personalization ----- */
+  const dataUse = `${capitalize(meaning("Data", "no tracking is required — the experience treats every participant the same and stays private by default"))}.`;
+
+  /* ----- Technology fit ----- */
+  const techFit = `${capitalize(meaning("Tech", "no particular platform is required — the design works in a plain physical space"))}. ${pick([
+    "The platform is a means, not the message: it should disappear behind the experience.",
+    `The technology earns its place only where it makes ${topic} feel closer.`,
+    "Delivery matches the design instead of driving it."
+  ])}`;
+
+  /* ----- Design rationale: one line per chosen dimension ----- */
+  const rationale = columnNames.map((col) => ({
+    col,
+    values: groups[col],
+    note: interpret(col, groups[col][0])
+  }));
+
+  /* ----- Optional expansion ----- */
+  const expansion = pick([
+    `Add a second session where participants swap roles and experience ${topic} from a completely different perspective.`,
+    `Extend the experience with a take-home artifact — ${pick(profile.artifacts)} that participants made or discovered, keeping ${topic} alive afterward.`,
+    `Scale it up: connect multiple groups so their choices ripple into each other's version of the experience.`,
+    `Layer in a facilitator character who can adjust difficulty and pacing in real time.`,
+    `Swap one dimension (a different Tech or Story element, say) and run it again — comparing the two versions is a design lesson in itself.`
+  ]);
+
+  return { title, pitch, audience, flow, interaction, immersion, goal, dataUse, techFit, rationale, expansion, groups, columnNames };
+}
+
+/* Generates and renders an idea.
+   kind = "full"  → the complete design concept
+   kind = "spark" → a shorter, brainstorm-style version */
+function generateIdea(kind) {
   const topicRaw = $("topic-input").value.trim();
   const groups = buildGroups();
-  const columnNames = Object.keys(groups);
 
-  if (columnNames.length === 0) {
+  if (Object.keys(groups).length === 0) {
     alert(
       mode === "inspire"
         ? "Roll a recipe first (press New Recipe)."
@@ -567,122 +908,76 @@ function generateIdea() {
   }
 
   const topic = topicRaw || "a topic of your choice";
+  const profile = analyzeTopic(topic);
+  const idea = composeIdea(topic, groups, profile);
+  lastGeneration = kind;
 
-  // All chosen values, minus awkward "none" entries, for use in prose
-  const allValues = proseValues(columnNames.flatMap((c) => groups[c]));
-  // A "signature" term featured in the title
-  const signature = allValues.length > 0 ? pick(allValues) : "Immersive";
-
-  // Convenience getter for specific dimensions (with graceful fallbacks)
-  const firstOf = (col, fallback) => proseValues(groups[col] || [])[0] || fallback;
-
-  const interactivity = firstOf("Interactivity", "open exploration");
-  const embodiment = firstOf("Embodiment", "their own natural perspective");
-  const coParticipation = firstOf("Co-Participation", "solo or small-group");
-  const story = firstOf("Story", "a lightly structured");
-  const dynamics = firstOf("Dynamics", "responsive");
-  const motivation = firstOf("Motivation", "curiosity");
-  const learning = firstOf("Learning", "hands-on discovery");
-  const tech = firstOf("Tech", "a low-tech physical space");
-
-  /* ----- Title ----- */
-  const title = pick([
-    `${capitalize(topic)}: The ${signature} Experience`,
-    `Inside ${capitalize(topic)}`,
-    `${capitalize(topic)}, Reimagined`,
-    `The ${signature} ${capitalize(topic)} Project`,
-    `${capitalize(topic)} Unlocked`
-  ]);
-
-  /* ----- Core concept ----- */
-  const concept = pick([
-    `An immersive experience built around ${topic}, weaving together ${naturalJoin(allValues.slice(0, 3))} into one participatory world.`,
-    `A designed experience that turns ${topic} into something participants step inside of, shaped by ${naturalJoin(allValues.slice(0, 3))}.`,
-    `Participants don't just learn about ${topic} — they inhabit it, through an experience defined by ${naturalJoin(allValues.slice(0, 3))}.`
-  ]);
-
-  /* ----- Audience / player role ----- */
-  const role = `Designed as a ${coParticipation} experience. Each participant is present through ${embodiment}, taking the role of ${pick([
-    "an active explorer",
-    "a curious apprentice",
-    "an investigator piecing things together",
-    "a co-creator of the world",
-    "a traveler moving through the experience"
-  ])} within the world of ${topic}.`;
-
-  /* ----- Interaction style ----- */
-  const interaction = `Interaction centers on ${interactivity}, with ${dynamics} dynamics guiding how the experience unfolds. Engagement is sustained through ${motivation}.`;
-
-  /* ----- Environment / setting ----- */
-  const environment = pick([
-    `Framed by ${story} story structure, the world of ${topic} becomes a place participants move through — with a clear sense of where they are and why it matters.`,
-    `The setting wraps participants in ${topic}, using ${story} story structure to give every space a purpose and every moment a sense of place.`
-  ]);
-
-  /* ----- Technology ----- */
-  const technology = pick([
-    `Delivered through ${tech}. The technology stays in service of the experience — creating presence rather than drawing attention to itself.`,
-    `${capitalize(tech)} carries the experience, chosen so the delivery amplifies immersion instead of distracting from ${topic}.`
-  ]);
-
-  /* ----- Learning / emotional goal ----- */
-  const goal = pick([
-    `Participants come away with ${learning} understanding of ${topic}, and an emotional memory of having been part of it rather than just observing it.`,
-    `The goal is ${learning} learning about ${topic} — paired with the feeling of genuine presence and accomplishment.`,
-    `By the end, participants should feel personally connected to ${topic}, having absorbed it through ${learning} engagement.`
-  ]);
-
-  /* ----- Why the chosen elements fit -----
-     One line per dimension, always naming both the column and value. */
-  const whyItems = columnNames.map((col) => {
-    const meaning = COLUMN_MEANINGS[col] || "a key dimension of the design";
-    return `<li><strong>${escapeHTML(col)}:</strong> this design uses <em>${escapeHTML(
-      naturalJoin(groups[col])
-    )}</em> — shaping ${escapeHTML(meaning)}.</li>`;
-  });
-
-  /* ----- "Column · Value" chips summarizing the recipe ----- */
-  const chips = columnNames
-    .map((col) => `<span class="chip">${escapeHTML(col)} · ${escapeHTML(groups[col].join(", "))}</span>`)
+  /* "Dimension · Value" chips summarizing the recipe used */
+  const chips = idea.columnNames
+    .map((col) => `<span class="chip">${escapeHTML(col)} · ${escapeHTML(idea.groups[col].join(", "))}</span>`)
     .join("");
 
-  /* ----- Optional expansion idea ----- */
-  const expansion = pick([
-    `Add a second session where participants swap roles and experience ${topic} from a completely different perspective.`,
-    `Extend the experience with a take-home artifact — something participants made or discovered that keeps ${topic} alive afterward.`,
-    `Scale it up: connect multiple groups so their choices ripple into each other's version of the experience.`,
-    `Layer in a facilitator or guide character who can adjust difficulty and pacing in real time.`,
-    `Try shifting one taxonomy dimension (for example, a different Tech or Story element) and compare how the experience changes.`
-  ]);
-
-  /* ----- Render the report card -----
-     Small helper keeps each section consistent: icon + label + body. */
   const section = (icon, label, bodyHTML) =>
     `<h3><span class="section-icon" aria-hidden="true">${icon}</span>${label}</h3>${bodyHTML}`;
+
+  const rationaleHTML = `<ul>${idea.rationale
+    .map(
+      (r) =>
+        `<li><strong>${escapeHTML(r.col)}:</strong> <em>${escapeHTML(naturalJoin(r.values))}</em> — ${escapeHTML(r.note)}.</li>`
+    )
+    .join("")}</ul>`;
+
+  let body;
+  if (kind === "spark") {
+    // Brainstorm card: pitch + three quick sparks to riff on
+    const sparks = [
+      `Open with this: participants ${pick(profile.actions)}.`,
+      ...pickSome(idea.rationale, Math.min(2, idea.rationale.length)).map(
+        (r) => `${capitalize(r.note)} (${r.col}: ${naturalJoin(r.values)}).`
+      )
+    ];
+    body = `
+      ${section("⚡", "Pitch", `<p>${escapeHTML(idea.pitch)}</p>`)}
+      ${section("💭", "Sparks", `<ul>${sparks.map((s) => `<li>${escapeHTML(s)}</li>`).join("")}</ul>`)}
+      ${section("🚀", "If It Has Legs", `<p>${escapeHTML(idea.expansion)}</p>`)}
+    `;
+  } else {
+    body = `
+      ${section("⚡", "Pitch", `<p>${escapeHTML(idea.pitch)}</p>`)}
+      ${section("👥", "Audience & Role", `<p>${escapeHTML(idea.audience)}</p>`)}
+      ${section("🗺️", "Experience Flow", `<p>${escapeHTML(idea.flow)}</p>`)}
+      ${section("🕹️", "Interaction Model", `<p>${escapeHTML(idea.interaction)}</p>`)}
+      ${section("🌊", "Immersion Strategy", `<p>${escapeHTML(idea.immersion)}</p>`)}
+      ${section("🎯", "Learning & Emotional Goal", `<p>${escapeHTML(idea.goal)}</p>`)}
+      ${section("📊", "Data & Personalization", `<p>${escapeHTML(idea.dataUse)}</p>`)}
+      ${section("🥽", "Technology Fit", `<p>${escapeHTML(idea.techFit)}</p>`)}
+      ${section("🧩", "Design Rationale", rationaleHTML)}
+      ${section("🚀", "Optional Expansion", `<p>${escapeHTML(idea.expansion)}</p>`)}
+    `;
+  }
 
   const output = $("idea-output");
   output.innerHTML = `
     <div class="recipe-chips">${chips}</div>
-    <h2>${escapeHTML(title)}</h2>
-    ${section("📋", "Summary", `<p>${escapeHTML(concept)}</p>`)}
-    ${section("👥", "Audience", `<p>${escapeHTML(role)}</p>`)}
-    ${section("🌍", "Environment", `<p>${escapeHTML(environment)}</p>`)}
-    ${section("🕹️", "Interaction", `<p>${escapeHTML(interaction)}</p>`)}
-    ${section("🎯", "Learning Goal", `<p>${escapeHTML(goal)}</p>`)}
-    ${section("🥽", "Technology", `<p>${escapeHTML(technology)}</p>`)}
-    ${section("🧩", "Design Rationale", `<ul>${whyItems.join("")}</ul>`)}
-    ${section("🚀", "Optional Expansion", `<p>${escapeHTML(expansion)}</p>`)}
+    <h2>${escapeHTML(idea.title)}</h2>
+    ${body}
   `;
   output.hidden = false;
   output.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
+/* Regenerate: same selections + topic, new variation. Falls back to
+   a full generation if nothing has been generated yet. */
+function regenerate() {
+  generateIdea(lastGeneration || "full");
+}
+
 /* ------------------------------------------------------------
-   10. MODE SWITCHING + WIRING EVERYTHING UP
+   12. MODE SWITCHING + WIRING EVERYTHING UP
    ------------------------------------------------------------ */
 const MODE_HINTS = {
   edit: "Click any cell or column header to edit its text. Changes save automatically.",
-  idea: "Click cells to select design elements, then enter a topic and generate an idea.",
+  idea: "Click cells to choose design elements — lock favorites, randomize the rest, then generate.",
   inspire: "A complete experience recipe — one element per dimension. Lock favorites, reroll the rest, then generate."
 };
 
@@ -753,18 +1048,23 @@ function init() {
   $("reset-btn").addEventListener("click", resetToDefault);
 
   // Design Ideas Mode buttons
-  $("generate-btn").addEventListener("click", generateIdea);
+  $("gen-full-btn").addEventListener("click", () => generateIdea("full"));
+  $("gen-spark-btn").addEventListener("click", () => generateIdea("spark"));
+  $("regen-btn").addEventListener("click", regenerate);
   $("random-path-btn").addEventListener("click", randomPath);
   $("randomize-btn").addEventListener("click", randomizeSelection);
+  $("lock-selection-btn").addEventListener("click", toggleSelectionLock);
   $("clear-btn").addEventListener("click", clearSelection);
 
   // Inspiration Mode buttons
-  $("inspire-generate-btn").addEventListener("click", generateIdea);
+  $("inspire-full-btn").addEventListener("click", () => generateIdea("full"));
+  $("inspire-spark-btn").addEventListener("click", () => generateIdea("spark"));
+  $("inspire-regen-btn").addEventListener("click", regenerate);
   $("new-recipe-btn").addEventListener("click", newRecipe);
 
-  // Pressing Enter in the topic box generates an idea
+  // Pressing Enter in the topic box generates a full experience
   $("topic-input").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") generateIdea();
+    if (e.key === "Enter") generateIdea("full");
   });
 
   setMode("edit"); // start in Edit Mode

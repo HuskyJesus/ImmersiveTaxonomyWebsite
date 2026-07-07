@@ -68,10 +68,17 @@
     <section id="idea-tools" class="panel panel-stack" aria-label="Design ideas tools" hidden>
       <!-- The shared topic input is moved into this slot by script.js -->
       <div id="idea-topic-slot"></div>
+      <!-- Generation actions -->
       <div class="toolbar-group">
-        <button id="generate-btn" class="btn btn-primary" type="button">✨ Generate Experience Idea</button>
+        <button id="gen-full-btn" class="btn btn-primary" type="button">✨ Generate Full Experience</button>
+        <button id="gen-spark-btn" class="btn" type="button">💡 Generate Inspiration</button>
+        <button id="regen-btn" class="btn" type="button">🔁 Regenerate</button>
         <button id="random-path-btn" class="btn btn-brand" type="button">🎲 Generate From Random Path</button>
+      </div>
+      <!-- Selection actions -->
+      <div class="toolbar-group">
         <button id="randomize-btn" class="btn" type="button">Randomize Selection</button>
+        <button id="lock-selection-btn" class="btn" type="button">🔒 Lock Selection</button>
         <button id="clear-btn" class="btn" type="button">Clear Selection</button>
       </div>
       <p id="selection-summary" class="panel-note"></p>
@@ -85,7 +92,9 @@
     <section id="inspire-tools" class="panel panel-stack" aria-label="Inspiration tools" hidden>
       <div id="inspire-topic-slot"></div>
       <div class="toolbar-group">
-        <button id="inspire-generate-btn" class="btn btn-primary" type="button">✨ Generate Experience Idea</button>
+        <button id="inspire-full-btn" class="btn btn-primary" type="button">✨ Generate Full Experience</button>
+        <button id="inspire-spark-btn" class="btn" type="button">💡 Generate Inspiration</button>
+        <button id="inspire-regen-btn" class="btn" type="button">🔁 Regenerate</button>
         <button id="new-recipe-btn" class="btn btn-brand" type="button">🎲 New Recipe</button>
       </div>
       <p class="panel-note">

@@ -26,9 +26,13 @@ The framework becomes selectable:
 
 - **Click cells** to select design elements (they highlight).
 - **Topic box** — enter any subject: "cooking", "video games", "creative writing within non-fiction", "history of the Civil War"…
-- **✨ Generate Experience Idea** — combines your topic with the selected elements into a full report card: Experience Title, Summary, Audience, Environment, Interaction, Learning Goal, Technology, Design Rationale (naming both the dimension and the value for every chosen element), and an Optional Expansion idea.
-- **🎲 Generate From Random Path** — selects one cell from *every* column and generates immediately.
-- **Randomize Selection / Clear Selection** — quick ways to reset the board.
+- **✨ Generate Full Experience** — a complete design concept: Experience Title, Pitch, Audience & Role, Experience Flow, Interaction Model, Immersion Strategy, Learning & Emotional Goal, Data & Personalization, Technology Fit, Design Rationale (naming both the dimension and the value for every chosen element), and an Optional Expansion.
+- **💡 Generate Inspiration** — a shorter, brainstorm-style card: pitch + a few sparks to riff on.
+- **🔁 Regenerate** — keeps the same selections and topic but produces a new variation.
+- **Randomize Selection** — builds a complete design recipe: exactly one cell from every column, never two from the same dimension.
+- **🔒 Lock Selection** — protects your current picks (shown in green); Randomize then fills only the unlocked dimensions. If a column has multiple selected cells, locking keeps the first — a recipe needs one value per dimension.
+- **🎲 Generate From Random Path** — fills a complete recipe (respecting locks) and generates immediately.
+- **Clear Selection** — resets the board and locks.
 
 ## ✨ Inspiration Mode
 
@@ -36,9 +40,16 @@ A brainstorming tool for workshops and teaching:
 
 - The site rolls a complete **experience recipe** — one value from every dimension, shown as a board of cards.
 - **🔄** on a card rerolls just that dimension; **🔓/🔒** locks it (e.g. *always VR*, *always Group*) so **🎲 New Recipe** keeps it while randomizing the rest.
-- Enter a topic ("Ancient Egypt", "Cooking"…) and **✨ Generate Experience Idea** turns the recipe into a fleshed-out concept.
+- Enter a topic ("Ancient Egypt", "Cooking"…) and generate a Full Experience or a quick Inspiration from the recipe.
 
-The generator is template-based and runs locally — no API, no internet connection, no cost.
+## How the generator works
+
+The generator is rule-based and runs entirely locally — no API, no internet connection, no cost:
+
+- Every **column** has a defined design role (Interactivity → what participants do, Data → personalization/tracking, Tech → platform assumptions, …) and every **default value** has a short interpretation (e.g. *Problem Solving* → "participants solve puzzles and challenges to move forward"; *AR* → "digital content overlaid onto the real world"). These live in `INTERPRETATIONS` and `COLUMN_ROLES` in `script.js`.
+- A small **topic analyzer** matches your topic against domain profiles (cooking, games, writing, history, science, art) and pulls fitting vocabulary — a history topic gets primary sources and pivotal decisions; a cooking topic gets ingredients and plating. Unmatched topics use a general-purpose profile. Add your own profiles in `DOMAIN_PROFILES`.
+- Sentence templates are randomized, so **Regenerate** produces a fresh variation from the same ingredients.
+- Custom columns and values still work — they get generic wording until you add interpretations for them.
 
 ## Deploying to GitHub Pages
 
