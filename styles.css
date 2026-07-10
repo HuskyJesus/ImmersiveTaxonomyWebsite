@@ -763,23 +763,329 @@ tbody td {
 .backup-tools .toolbar-group { margin-top: 12px; }
 
 /* ------------------------------------------------------------
-   Admin entry point (footer)
+   Header account controls (upper right)
    ------------------------------------------------------------ */
-.admin-link {
-  border: none;
-  background: transparent;
-  color: var(--green-100);
-  opacity: 0.7;
-  font: inherit;
-  font-size: 0.8rem;
-  text-decoration: underline;
+.account-area { display: flex; align-items: center; gap: 8px; }
+
+#auth-buttons { display: flex; gap: 8px; }
+
+.account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
-  padding: 2px 4px;
+  transition: background 0.2s ease, transform 0.15s ease;
 }
 
-.admin-link:hover { opacity: 1; }
+.account-btn:hover { background: rgba(255, 255, 255, 0.18); transform: translateY(-1px); }
 
-.admin-status { font-size: 0.8rem; opacity: 0.8; margin-left: 8px; }
+.account-btn-solid {
+  background: var(--gradient);
+  border-color: transparent;
+}
+.account-btn-solid:hover { filter: brightness(1.1); }
+
+.account-menu-wrap { position: relative; }
+
+.account-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lift);
+  min-width: 200px;
+  padding: 6px;
+  z-index: 50;
+  animation: rise 0.18s ease both;
+}
+
+.account-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.account-dropdown button:hover { background: var(--green-100); }
+
+.auth-info {
+  margin: 12px 0 0;
+  color: var(--green-700);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 16px 0 0;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  color: var(--grad-a);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-btn:hover { color: var(--grad-b); }
+
+/* ------------------------------------------------------------
+   Taxonomy search
+   ------------------------------------------------------------ */
+.search-bar {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+#search-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#search-input:focus {
+  outline: none;
+  border-color: var(--grad-a);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lift);
+  z-index: 40;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 6px;
+  animation: rise 0.18s ease both;
+}
+
+.search-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.search-result:hover, .search-result:focus-visible { background: var(--grad-soft); }
+
+.search-result strong { display: block; font-size: 0.95rem; }
+.search-result small { color: var(--ink-soft); font-size: 0.8rem; }
+
+.search-context {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--green-700);
+}
+
+.search-empty { margin: 8px 12px; color: var(--ink-soft); font-size: 0.88rem; }
+
+/* ------------------------------------------------------------
+   Value cells: text + tiny ⓘ/✎ button
+   ------------------------------------------------------------ */
+td .cell-text { display: inline; }
+
+.cell-info-btn {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 1px 5px;
+  margin-left: 4px;
+  border-radius: 6px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
+.cell-info-btn:hover { background: var(--grad-soft); color: var(--grad-a); }
+
+.selectable.is-selected .cell-info-btn { color: var(--grad-a); }
+
+.edit-cell .cell-text {
+  outline: none;
+  cursor: text;
+  min-height: 1em;
+  display: inline-block;
+  min-width: 40px;
+}
+
+.edit-cell .cell-text:focus {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px var(--grad-a);
+  border-radius: 4px;
+}
+
+/* Recipe card value doubles as an info button */
+.recipe-value-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 2.6em;
+  color: inherit;
+}
+
+.recipe-value-btn:hover { color: var(--grad-a); text-decoration: underline dotted; }
+
+/* ------------------------------------------------------------
+   Saved experiences library
+   ------------------------------------------------------------ */
+.modal-wide { width: min(760px, calc(100vw - 32px)); }
+
+.modal-context {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green-700);
+}
+
+.library-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 8px 0 14px;
+}
+
+.library-controls input[type="search"] {
+  flex: 1;
+  min-width: 160px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.library-controls select {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.lib-filter { font-size: 0.88rem; font-weight: 600; }
+
+.lib-list { display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow-y: auto; }
+
+.lib-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--cell);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+}
+
+.lib-item:hover { background: var(--grad-soft); transform: translateY(-1px); box-shadow: var(--shadow); }
+
+.lib-item-fav { color: #d97706; font-size: 1rem; }
+.lib-item-main { flex: 1; min-width: 0; }
+.lib-item-main strong { display: block; font-size: 0.95rem; }
+.lib-item-main small { color: var(--ink-soft); font-size: 0.8rem; }
+
+.lib-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.lib-title-input {
+  flex: 1;
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.lib-fav-btn { font-size: 1.2rem; color: #d97706; }
+
+.lib-actions { margin: 14px 0; }
+
+.lib-content {
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+
+.lib-content h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Save button under a generated idea */
+.idea-actions { margin-top: 22px; }
+
+.rationale-role { color: var(--ink-soft); font-size: 0.86em; }
 
 /* ------------------------------------------------------------
    Footer
@@ -803,4 +1109,11 @@ tbody td {
   .topic-row { flex-direction: column; align-items: stretch; }
   th, td { padding: 8px 9px; }
   .idea-output { padding: 22px 20px; }
+
+  /* Compact account controls on small screens: the dropdown keeps
+     Saved Experiences + Sign Out reachable, the name is hidden */
+  .account-name { display: none; }
+  .account-btn { padding: 8px 10px; }
+  .library-controls { flex-direction: column; align-items: stretch; }
+  .lib-actions .btn { flex: 1; }
 }

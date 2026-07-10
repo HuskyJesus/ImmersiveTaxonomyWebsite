@@ -8,17 +8,19 @@
 // ─────────────────────────────────────────────────────────────
 // ADMINISTRATOR ALLOWLIST — the ONE place to manage edit access.
 // To add or remove an administrator, edit this list and publish.
-// UIDs come from: Firebase Console → Authentication → Users
-// → "User UID" column.
+// UIDs come from: Firebase Console → Authentication → Users.
 // ─────────────────────────────────────────────────────────────
 //
-// What these rules enforce:
-//   - Anyone (signed in or not) can READ the published taxonomy,
-//     so the public website works for every visitor.
-//   - Only the administrators listed below can WRITE.
-//     Creating a Firebase account does NOT grant edit access —
-//     the UID must be in the allowlist.
-//   - Every other document in the database is fully locked down.
+// Access model:
+//   Public (no account)  — read the published taxonomy
+//   Any signed-in user   — manage ONLY their own profile and
+//                          their own saved experiences
+//   Administrators       — additionally write the taxonomy
+//
+// Creating an account NEVER grants admin access, and nothing a
+// user can write (including their own profile document) is ever
+// consulted for authorization — only this UID allowlist is.
+// Users therefore cannot promote themselves.
 
 rules_version = '2';
 
@@ -33,10 +35,25 @@ service cloud.firestore {
       ];
     }
 
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
     // The published taxonomy (one document: taxonomy/current)
     match /taxonomy/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read: if true;              // public website
+      allow write: if isAdmin();        // admins only
+    }
+
+    // User profiles: each user manages only their own document.
+    // Profiles hold display metadata only — no roles, no passwords.
+    match /users/{uid} {
+      allow read, create, update, delete: if isOwner(uid);
+
+      // Saved experiences: private to their owner
+      match /savedExperiences/{experienceId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
     }
 
     // Everything else: no access

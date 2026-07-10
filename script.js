@@ -2,193 +2,148 @@
    Immersive Experience Design Taxonomy — script.js
 
    How this file is organized:
-     1. Default taxonomy data (columns now carry descriptions)
+     1. Imports, constants, admin allowlist
      2. App state
-     3. Local persistence (localStorage cache + v1 migration)
-     4. Cloud sync (Firebase Auth + Firestore, optional)
-     5. Access control (public view vs. admin edit)
-     6. Rendering — the taxonomy grid
-     7. Rendering — the recipe board (Inspiration mode)
-     8. Category description modal + editor dialogs
-     9. Edit Mode actions (rows, columns, import/export, reset)
-    10. Design Ideas Mode actions (select, lock, randomize)
-    11. Inspiration Mode actions (new recipe, reroll, lock)
-    12. The idea generator — knowledge maps
-    13. The idea generator — topic analysis
-    14. The idea generator — composing and rendering ideas
-    15. Mode switching + wiring everything up
+     3. Data model helpers + migration (v1/v2 → v3)
+     4. Local persistence (localStorage cache)
+     5. Cloud sync (Firestore, optional)
+     6. Authentication + user accounts
+     7. Access control (public / user / admin)
+     8. Saved experiences (Firestore subcollection)
+     9. Experience library UI
+    10. Rendering — the taxonomy grid
+    11. Rendering — the recipe board (Inspiration mode)
+    12. Description viewer + editor dialogs
+    13. Taxonomy search
+    14. Edit Mode actions
+    15. Design Ideas Mode actions
+    16. Inspiration Mode actions
+    17. The idea generator
+    18. Mode switching + wiring everything up
 
-   DATA MODEL (schema version 2)
-   Each column is an object with a STABLE id — renaming a column
-   never breaks its description or anything keyed to it:
+   DATA MODEL (schema version 3)
+   Columns AND values carry stable ids and descriptions — renaming
+   either never loses anything keyed to it:
      {
-       schemaVersion: 2,
+       schemaVersion: 3,
        columns: [{ id, name, shortDescription, detailedDescription, example }],
-       rows: [["Passive", ...], ...]    // one cell per column, per row
+       rows: [[{ id, text, shortDescription, detailedDescription, example }, ...], ...]
      }
 
-   CLOUD SAVING is optional. Until firebase-config.js is filled in,
-   the site runs exactly like a local-only app (edits stay in this
-   browser). Once configured:
-     - everyone can view the published taxonomy (Firestore read)
-     - only signed-in admins listed in firestore.rules can write
+   ACCESS LEVELS
+     Public       — view, read descriptions, select, randomize, generate
+     Signed-in    — everything public + save experiences to their library
+     Administrator— everything + Edit Mode + cloud taxonomy saving
+   The Firestore Security Rules (firestore.rules) are the real
+   authority; the ADMIN_UIDS list below only shapes the UI.
    ============================================================ */
 
 import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+import { DEFAULT_COLUMNS, VALUE_STARTERS, buildDefaultTaxonomy } from "./starter-content.js";
 
 /* ------------------------------------------------------------
-   1. DEFAULT TAXONOMY
-   The descriptions below are EDITABLE STARTER CONTENT — clear,
-   professional placeholders, not final academic definitions.
-   Edit them in the site (Edit Mode → ✎ beside a column) or here.
+   1. CONSTANTS + ADMIN ALLOWLIST
    ------------------------------------------------------------ */
-const DEFAULT_COLUMNS = [
-  {
-    id: "interactivity",
-    name: "Interactivity",
-    shortDescription: "How much, and in what way, participants can act within the experience.",
-    detailedDescription: "Interactivity ranges from purely watching to solving problems, moving physically, or engaging other people. It sets the baseline for what a participant is invited — or required — to do, and every other design choice tends to build on it.",
-    example: "A museum exhibit is Passive when visitors only view it; it becomes Problem Solving when visitors must decode a cipher to open the next room."
-  },
-  {
-    id: "embodiment",
-    name: "Embodiment",
-    shortDescription: "How present participants feel inside the experience — where their body and point of view sit.",
-    detailedDescription: "Embodiment describes the participant's relationship to the world: watching it from outside, standing invisibly within it, seeing through their own eyes, having their movement mirrored, or being met by real humans. Stronger embodiment usually means stronger immersion — and higher design stakes.",
-    example: "The same battlefield scene feels documentary-like from a Detached view, and overwhelming in First Person POV as musket fire passes overhead."
-  },
-  {
-    id: "co-participation",
-    name: "Co-Participation",
-    shortDescription: "The social structure — how many people share the experience and how they relate.",
-    detailedDescription: "Co-Participation covers everything from a solo session to intimate one-on-one encounters, small groups, massive shared worlds, and asymmetric setups where some people act while others watch and influence. It determines whether meaning comes from private reflection or shared negotiation.",
-    example: "An escape room is a Group experience; the same puzzles reworked as a play-by-post with an audience voting on hints becomes Secondary Perspective."
-  },
-  {
-    id: "story",
-    name: "Story",
-    shortDescription: "How narrative is structured — from none at all to a story that adapts around the participant.",
-    detailedDescription: "Story sets the narrative spine: an experience can rely on pure activity with no plot, imply a story through its setting, deliver a fixed authored narrative, branch on participant choices, or continuously reshape itself. More narrative flexibility generally trades authorial control for participant ownership.",
-    example: "A cooking class has no story; a themed dinner where each course reveals a chapter of a chef's journey uses a Pre-created narrative."
-  },
-  {
-    id: "dynamics",
-    name: "Dynamics",
-    shortDescription: "How much agency participants have and how the system responds to what they do.",
-    detailedDescription: "Dynamics describes the rules of cause and effect: events may run on rails, pause at decision points, respond to free action, negotiate through open dialogue, or let participants shift their point of view on the system itself. It is the dimension participants feel most directly, moment to moment.",
-    example: "A haunted house is Predetermined — everyone gets the same scares. An improv-driven version where actors build on whatever guests do runs on Free Will."
-  },
-  {
-    id: "motivation",
-    name: "Motivation",
-    shortDescription: "Why participants keep going — the engagement engine of the experience.",
-    detailedDescription: "Motivation covers the incentives that sustain attention: pure curiosity, inherently satisfying mechanics, difficulty and mastery, steady reinforcement, or explicit reward systems. Matching the motivation style to the audience is often the difference between an experience people finish and one they abandon.",
-    example: "A language-learning quest can rely on Challenge (beat the conversation boss) or a Reward System (streaks, badges, and unlockable dialects)."
-  },
-  {
-    id: "meta-control",
-    name: "Meta Control",
-    shortDescription: "Whether participants can shape the world and its rules, not just act inside them.",
-    detailedDescription: "Meta Control ranges from playing the world exactly as given, to steering your own journey, defining your character, editing parts of the world, or building the world itself. High meta control turns participants into co-designers — powerful for ownership, demanding for the design.",
-    example: "In a historical simulation, students who can redraw supply lines and re-run the campaign are using World Editor control rather than following a fixed scenario."
-  },
-  {
-    id: "learning",
-    name: "Learning",
-    shortDescription: "How knowledge is delivered and absorbed within the experience.",
-    detailedDescription: "Learning may arrive as small foundational pieces, direct explicit instruction, implicit absorption through doing, structured recall of prior knowledge, or synthesis where participants combine ideas into something new. Immersive design shines when the learning style is woven into the activity instead of bolted on.",
-    example: "A chemistry escape room teaches Implicitly — players internalize reaction rules because the door will not open otherwise."
-  },
-  {
-    id: "data",
-    name: "Data",
-    shortDescription: "What the experience knows about participants — personalization and tracking.",
-    detailedDescription: "Data ranges from fully anonymous sessions, to knowing names and identities, tracking behavior within a session, maintaining persistent personal profiles, or responding to live biometric signals. More data enables deeper personalization and raises the bar for trust and transparency.",
-    example: "A meditation space that softens its soundscape when a wearable reports rising heart rate is using Biometric data."
-  },
-  {
-    id: "tech",
-    name: "Tech",
-    shortDescription: "The delivery platform — from no technology at all to fully mixed physical-digital systems.",
-    detailedDescription: "Tech sets the platform assumptions: analog and physical, flat screens, augmented overlays on the real world, fully simulated virtual spaces, or mixed systems that span physical and digital. The strongest designs choose the lightest technology that still delivers the intended presence.",
-    example: "A city history walk works on 2D (a map app), in AR (ghost buildings overlaid on real streets), or with no tech at all (props, actors, and good writing)."
-  }
+const STORAGE_KEY = "immersive-taxonomy-v3";
+const LEGACY_KEYS = ["immersive-taxonomy-v2", "immersive-taxonomy-v1"];
+const FIREBASE_VERSION = "10.12.2";
+const CLOUD_DOC_PATH = ["taxonomy", "current"];
+const SCHEMA_VERSION = 3;
+const EXPERIENCE_SCHEMA_VERSION = 1;
+
+/* The ONLY administrators. Creating an account never grants admin
+   access — this list (mirrored in firestore.rules, which is the
+   real enforcement point) is the single source of truth. */
+const ADMIN_UIDS = [
+  "jtOD9eMDeETUXSALKFaQy0sCDiK2",   // Father
+  "qN6weHvgweP171ka6dLtrOIU4203"    // Site maintainer
 ];
 
-const DEFAULT_TAXONOMY = {
-  schemaVersion: 2,
-  columns: DEFAULT_COLUMNS,
-  rows: [
-    ["Passive", "Detached", "Single Person", "None", "Predetermined", "None", "None", "Elemental", "Anonymous", "none"],
-    ["Interactive", "Observer", "One on One", "Setting", "Choice", "Basic Mechanics", "Journey", "Explicit", "Identity", "2D"],
-    ["Problem Solving", "First Person POV", "Group", "Pre-created", "Free Will", "Challenge", "Character", "Implicit", "In-session", "AR"],
-    ["Physicalized", "Movement Control", "MMO", "Choose your own", "Conversational Reality", "Reinforcement", "World Editor", "Recall", "Personalized", "VR"],
-    ["Interpersonal", "Human to Human", "Secondary Perspective", "Adaptive Story", "Adjustible POV", "Reward System", "World Builder", "Sythensis", "Biometric", "XR"]
-  ]
-};
-
-/* localStorage keys (v1 was the pre-descriptions format) */
-const STORAGE_KEY = "immersive-taxonomy-v2";
-const LEGACY_STORAGE_KEY = "immersive-taxonomy-v1";
-
-/* ------------------------------------------------------------
-   2. APP STATE
-   ------------------------------------------------------------ */
-/* Sync metadata recovered from the localStorage cache (whether the
-   cached taxonomy has unsaved edits, and which cloud revision it
-   was based on). Populated by loadLocalTaxonomy() below. */
-let cloudMetaFromCache = { revision: null, dirty: false, dirtyAt: null };
-
-let taxonomy = loadLocalTaxonomy();  // the current framework data
-let mode = "idea";                   // "edit" | "idea" | "inspire"
-let selectedCells = new Set();       // Design Ideas selections, as "row:col" strings
-let lockedSelection = new Set();     // subset of selections protected from Randomize
-let recipe = null;                   // Inspiration mode: row index per column (-1 = none)
-let lockedColumns = new Set();       // Inspiration mode: locked column indexes
-let lastGeneration = null;           // "spark" | "full" — what Regenerate repeats
-
-/* Cloud sync state — populated by initCloud() when configured */
-const cloud = {
-  configured: isFirebaseConfigured(),
-  ready: false,        // SDK loaded and initial fetch attempted
-  db: null,
-  auth: null,
-  fns: null,           // firestore/auth functions from the dynamic imports
-  user: null,          // signed-in Firebase user (admins sign in here)
-  revision: null,      // updatedAt millis of the cloud version we're based on
-  dirty: false,        // unsaved changes exist
-  saveTimer: null,     // debounce timer
-  saving: false
-};
+/* Reusable admin check — use this everywhere, never inline UIDs */
+function isAdminUid(uid) {
+  return ADMIN_UIDS.includes(uid);
+}
 
 /* Shortcut for grabbing elements by id */
 const $ = (id) => document.getElementById(id);
 
 /* ------------------------------------------------------------
-   3. LOCAL PERSISTENCE
-   localStorage is the backup layer: it caches the latest known
-   taxonomy and preserves unsaved edits across refreshes.
-   Stored shape: { taxonomy, cloudRevision, dirty, dirtyAt }
+   2. APP STATE
    ------------------------------------------------------------ */
-function makeColumnId(name) {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "column";
-  return `${slug}-${Math.random().toString(36).slice(2, 8)}`;
+/* Sync metadata recovered from the localStorage cache. Populated
+   by loadLocalTaxonomy() below — declared first to avoid TDZ. */
+let cloudMetaFromCache = { revision: null, dirty: false, dirtyAt: null };
+
+let taxonomy = loadLocalTaxonomy();  // the current framework data
+let mode = "idea";                   // "edit" | "idea" | "inspire"
+let selectedCells = new Set();       // Design Ideas selections, as "row:col" strings
+let lockedSelection = new Set();     // subset protected from Randomize
+let recipe = null;                   // Inspiration: row index per column (-1 = none)
+let lockedColumns = new Set();       // Inspiration: locked column indexes
+let lastGeneration = null;           // { kind, topic, idea, selections } — for Regenerate + Save
+
+const cloud = {
+  configured: isFirebaseConfigured(),
+  ready: false,
+  db: null,
+  auth: null,
+  fns: null,           // firestore + auth functions from the dynamic imports
+  user: null,          // signed-in Firebase user (any account)
+  revision: null,      // updatedAt millis of the cloud version we're based on
+  dirty: false,
+  saveTimer: null,
+  saving: false
+};
+
+/* ------------------------------------------------------------
+   3. DATA MODEL HELPERS + MIGRATION
+   ------------------------------------------------------------ */
+function slugify(text) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-/* Upgrades a v1 taxonomy ({columns: [names], rows}) to v2.
-   Default columns get their starter descriptions back. */
-function migrateV1(old) {
-  const byName = Object.fromEntries(DEFAULT_COLUMNS.map((c) => [c.name, c]));
+function makeColumnId(name) {
+  return `${slugify(name) || "column"}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function makeValueId(text) {
+  return `${slugify(text) || "value"}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/* A brand-new empty cell — every value gets a stable id and a
+   blank description record from the moment it exists. */
+function makeCell(text = "") {
+  return { id: makeValueId(text), text, shortDescription: "", detailedDescription: "", example: "" };
+}
+
+/* Starter descriptions for a known default value (or blanks) */
+function starterFor(columnId, text) {
+  return (VALUE_STARTERS[columnId] || {})[text] || { short: "", detailed: "", example: "" };
+}
+
+/* Wraps a plain-string cell (v1/v2 data) into a v3 cell object,
+   pulling in starter descriptions when the value is a known
+   default. Existing text is never altered. */
+function upgradeCell(text, columnId) {
+  const starter = starterFor(columnId, text);
   return {
-    schemaVersion: 2,
-    columns: old.columns.map((name) => {
-      const preset = byName[name];
-      return preset
-        ? structuredClone(preset)
-        : { id: makeColumnId(name), name, shortDescription: "", detailedDescription: "", example: "" };
-    }),
-    rows: old.rows
+    id: makeValueId(text),
+    text,
+    shortDescription: starter.short,
+    detailedDescription: starter.detailed,
+    example: starter.example
   };
+}
+
+function isValidV3(data) {
+  return (
+    data && data.schemaVersion === 3 &&
+    Array.isArray(data.columns) && data.columns.length > 0 &&
+    data.columns.every((c) => c && typeof c.id === "string" && typeof c.name === "string") &&
+    Array.isArray(data.rows) &&
+    data.rows.every((row) => Array.isArray(row) && row.length === data.columns.length &&
+      row.every((cell) => cell && typeof cell.id === "string" && typeof cell.text === "string"))
+  );
 }
 
 function isValidV2(data) {
@@ -207,24 +162,75 @@ function isValidV1(data) {
     data && Array.isArray(data.columns) && data.columns.length > 0 &&
     data.columns.every((c) => typeof c === "string") &&
     Array.isArray(data.rows) &&
-    data.rows.every((row) => Array.isArray(row) && row.length === data.columns.length)
+    data.rows.every((row) => Array.isArray(row) && row.length === data.columns.length &&
+      row.every((cell) => typeof cell === "string"))
   );
 }
 
-/* Normalizes any accepted import/cache shape into v2 */
+/* Fills in optional fields that older v3 data might lack */
+function tidyV3(data) {
+  data.columns.forEach((c) => {
+    c.shortDescription = c.shortDescription || "";
+    c.detailedDescription = c.detailedDescription || "";
+    c.example = c.example || "";
+  });
+  data.rows.forEach((row) =>
+    row.forEach((cell) => {
+      cell.shortDescription = cell.shortDescription || "";
+      cell.detailedDescription = cell.detailedDescription || "";
+      cell.example = cell.example || "";
+    })
+  );
+  return data;
+}
+
+/* MIGRATION: accepts v3, v2, or v1 shapes and returns v3.
+   - all existing ids are kept
+   - missing descriptions are populated from starter content when
+     the value/column matches a known default; custom text is
+     never overwritten
+   - schemaVersion is bumped to 3 */
 function normalizeTaxonomy(data) {
+  if (isValidV3(data)) return tidyV3(data);
+
   if (isValidV2(data)) {
-    data.columns.forEach((c) => {         // tolerate missing optional fields
-      c.shortDescription = c.shortDescription || "";
-      c.detailedDescription = c.detailedDescription || "";
-      c.example = c.example || "";
-    });
-    return data;
+    // v2: column objects (keep their ids + descriptions), string cells
+    return {
+      schemaVersion: 3,
+      columns: data.columns.map((c) => ({
+        id: c.id,
+        name: c.name,
+        shortDescription: c.shortDescription || "",
+        detailedDescription: c.detailedDescription || "",
+        example: c.example || ""
+      })),
+      rows: data.rows.map((row) => row.map((text, c) => upgradeCell(text, data.columns[c].id)))
+    };
   }
-  if (isValidV1(data)) return migrateV1(data);
+
+  if (isValidV1(data)) {
+    // v1: plain column names + string cells
+    const byName = Object.fromEntries(DEFAULT_COLUMNS.map((c) => [c.name, c]));
+    const columns = data.columns.map((name) => {
+      const preset = byName[name];
+      return preset
+        ? structuredClone(preset)
+        : { id: makeColumnId(name), name, shortDescription: "", detailedDescription: "", example: "" };
+    });
+    return {
+      schemaVersion: 3,
+      columns,
+      rows: data.rows.map((row) => row.map((text, c) => upgradeCell(text, columns[c].id)))
+    };
+  }
+
   return null;
 }
 
+/* ------------------------------------------------------------
+   4. LOCAL PERSISTENCE
+   Stored shape: { taxonomy, cloudRevision, dirty, dirtyAt }
+   ------------------------------------------------------------ */
 function loadLocalTaxonomy() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -236,16 +242,21 @@ function loadLocalTaxonomy() {
         return tax;
       }
     }
-    // One-time migration from the old v1 key
-    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (legacy) {
-      const tax = normalizeTaxonomy(JSON.parse(legacy));
-      if (tax) return tax;
+    // One-time migration from older storage keys
+    for (const key of LEGACY_KEYS) {
+      const legacy = localStorage.getItem(key);
+      if (!legacy) continue;
+      const parsed = JSON.parse(legacy);
+      const tax = normalizeTaxonomy(parsed.taxonomy || parsed);   // v2 wrapped, v1 bare
+      if (tax) {
+        if (parsed.dirty) cloudMetaFromCache = { revision: parsed.cloudRevision ?? null, dirty: true, dirtyAt: parsed.dirtyAt ?? null };
+        return tax;
+      }
     }
   } catch (err) {
     console.warn("Could not load saved taxonomy, using default.", err);
   }
-  return structuredClone(DEFAULT_TAXONOMY);
+  return buildDefaultTaxonomy();
 }
 
 function saveLocal() {
@@ -258,47 +269,54 @@ function saveLocal() {
 }
 
 /* ------------------------------------------------------------
-   4. CLOUD SYNC (Firebase Auth + Cloud Firestore)
-   Loaded on demand so the site stays fast — and fully functional
-   — when firebase-config.js has not been filled in yet.
+   5. CLOUD SYNC (Cloud Firestore)
+   Firestore can't store arrays-of-arrays, so the grid is saved
+   column-major: each column carries its own values list.
    ------------------------------------------------------------ */
-const FIREBASE_VERSION = "10.12.2";
-const CLOUD_DOC_PATH = ["taxonomy", "current"];
-
-/* Firestore cannot store arrays-of-arrays, so the grid is saved
-   column-major: each column object carries its own values list. */
 function serializeForCloud() {
   return {
-    schemaVersion: 2,
+    schemaVersion: SCHEMA_VERSION,
     columns: taxonomy.columns.map((col, c) => ({
       id: col.id,
       name: col.name,
       shortDescription: col.shortDescription,
       detailedDescription: col.detailedDescription,
       example: col.example,
-      values: taxonomy.rows.map((row) => row[c])
+      values: taxonomy.rows.map((row) => ({ ...row[c] }))
     })),
     rowCount: taxonomy.rows.length
   };
 }
 
+/* Accepts v3 cloud docs (value objects) AND v2 docs (value strings),
+   so existing published data migrates transparently on load. */
 function deserializeFromCloud(data) {
   if (!data || !Array.isArray(data.columns) || data.columns.length === 0) return null;
   const rowCount = data.rowCount ?? Math.max(...data.columns.map((c) => (c.values || []).length), 0);
-  const tax = {
-    schemaVersion: 2,
-    columns: data.columns.map((c) => ({
-      id: c.id || makeColumnId(c.name || "column"),
-      name: c.name || "Untitled",
-      shortDescription: c.shortDescription || "",
-      detailedDescription: c.detailedDescription || "",
-      example: c.example || ""
-    })),
-    rows: Array.from({ length: rowCount }, (_, r) =>
-      data.columns.map((c) => ((c.values || [])[r] ?? ""))
-    )
-  };
-  return isValidV2(tax) ? tax : null;
+  const columns = data.columns.map((c) => ({
+    id: c.id || makeColumnId(c.name || "column"),
+    name: c.name || "Untitled",
+    shortDescription: c.shortDescription || "",
+    detailedDescription: c.detailedDescription || "",
+    example: c.example || ""
+  }));
+  const rows = Array.from({ length: rowCount }, (_, r) =>
+    data.columns.map((c, ci) => {
+      const v = (c.values || [])[r];
+      if (v && typeof v === "object") {                    // v3 cell
+        return {
+          id: v.id || makeValueId(v.text || ""),
+          text: v.text || "",
+          shortDescription: v.shortDescription || "",
+          detailedDescription: v.detailedDescription || "",
+          example: v.example || ""
+        };
+      }
+      return upgradeCell(typeof v === "string" ? v : "", columns[ci].id);   // v2 cell
+    })
+  );
+  const tax = { schemaVersion: 3, columns, rows };
+  return isValidV3(tax) ? tax : null;
 }
 
 async function initCloud() {
@@ -319,9 +337,7 @@ async function initCloud() {
     cloud.auth = authMod.getAuth(app);
     cloud.fns = { ...fsMod, ...authMod };
 
-    // Watch sign-in state (persists across visits automatically)
     authMod.onAuthStateChanged(cloud.auth, onAuthChanged);
-
     await loadFromCloud();
   } catch (err) {
     console.warn("Cloud unavailable, using local cache.", err);
@@ -360,7 +376,7 @@ async function loadFromCloud() {
       cloud.dirty = true;
       cloud.revision = cloudMetaFromCache.revision;
       setSyncStatus("pending", "Offline changes pending — sign in as admin and save to publish them.");
-      return;   // keep the locally loaded taxonomy
+      return;
     }
   }
 
@@ -373,10 +389,8 @@ async function loadFromCloud() {
   updateLastSaved(cloudRevision);
 }
 
-/* Debounced automatic save: called after every edit */
 function scheduleCloudSave() {
-  if (!canEdit()) return;
-  if (!cloud.configured || !cloud.user) return;   // local-only mode saves instantly anyway
+  if (!cloud.configured || !cloud.user || !isAdminUid(cloud.user.uid)) return;
   clearTimeout(cloud.saveTimer);
   setSyncStatus("info", "Saving…");
   cloud.saveTimer = setTimeout(saveToCloud, 1200);
@@ -394,7 +408,6 @@ async function saveToCloud() {
       updatedAt: serverTimestamp(),
       updatedBy: cloud.user.uid
     });
-    // Read back the server timestamp so revisions stay comparable
     const snap = await getDoc(ref);
     cloud.revision = snap.data()?.updatedAt?.toMillis?.() ?? Date.now();
     cloud.dirty = false;
@@ -416,7 +429,6 @@ async function saveToCloud() {
   cloud.saving = false;
 }
 
-/* Restore the last saved cloud version (discarding local edits) */
 async function restoreCloudVersion() {
   if (!cloud.configured || !cloud.fns) return;
   if (!confirm("Replace the taxonomy on screen with the last saved cloud version?")) return;
@@ -439,11 +451,10 @@ async function restoreCloudVersion() {
   }
 }
 
-/* --- Save status UI --- */
 function setSyncStatus(kind, message) {
   const el = $("sync-status");
   el.textContent = message;
-  el.className = `sync-status is-${kind}`;   // is-ok / is-info / is-pending / is-error / is-local
+  el.className = `sync-status is-${kind}`;
 }
 
 function updateLastSaved(millis) {
@@ -452,13 +463,12 @@ function updateLastSaved(millis) {
     : "";
 }
 
-/* Every edit funnels through here: persist locally right away,
-   then (for signed-in admins) autosave to the cloud after a pause. */
+/* Every taxonomy edit funnels through here */
 function markChanged() {
   cloud.dirty = true;
   saveLocal();
   if (cloud.configured) {
-    if (cloud.user) {
+    if (cloud.user && isAdminUid(cloud.user.uid)) {
       scheduleCloudSave();
     } else {
       setSyncStatus("pending", "Offline changes pending — sign in as admin to save them to the cloud.");
@@ -470,7 +480,6 @@ function markChanged() {
   }
 }
 
-/* Warn before leaving with unsaved cloud changes */
 window.addEventListener("beforeunload", (e) => {
   if (cloud.configured && cloud.dirty) {
     e.preventDefault();
@@ -479,84 +488,421 @@ window.addEventListener("beforeunload", (e) => {
 });
 
 /* ------------------------------------------------------------
-   5. ACCESS CONTROL
-   Public visitors explore and generate; editing requires either
-   an admin sign-in (when cloud is configured) or local mode.
+   6. AUTHENTICATION + USER ACCOUNTS
+   Email/password via Firebase Auth. Registration creates a
+   users/{uid} profile document. Passwords never touch Firestore.
+   ------------------------------------------------------------ */
+let authMode = "signin";   // "signin" | "signup" | "reset"
+
+/* Friendly messages for common Firebase auth error codes */
+function authErrorMessage(err) {
+  const code = err?.code || "";
+  const messages = {
+    "auth/invalid-email": "That doesn't look like a valid email address.",
+    "auth/email-already-in-use": "An account with that email already exists — try signing in instead.",
+    "auth/weak-password": "Please choose a longer password (at least 6 characters).",
+    "auth/invalid-credential": "Email or password is incorrect.",
+    "auth/wrong-password": "Email or password is incorrect.",
+    "auth/user-not-found": "No account found with that email.",
+    "auth/too-many-requests": "Too many attempts — please wait a minute and try again.",
+    "auth/network-request-failed": "Network problem — check your connection and try again."
+  };
+  return messages[code] || `Something went wrong (${code || "unknown error"}). Please try again.`;
+}
+
+function openAuthModal(startMode) {
+  setAuthMode(startMode);
+  $("auth-error").hidden = true;
+  $("auth-info").hidden = true;
+  $("auth-email").value = "";
+  $("auth-password").value = "";
+  $("auth-confirm").value = "";
+  $("auth-name").value = "";
+  $("auth-modal").showModal();
+  ($(authMode === "signup" ? "auth-name" : "auth-email")).focus();
+}
+
+function setAuthMode(next) {
+  authMode = next;
+  const titles = { signin: "Sign In", signup: "Create Account", reset: "Reset Password" };
+  const submits = { signin: "Sign In", signup: "Sign Up", reset: "Send Reset Email" };
+  $("auth-title").textContent = titles[next];
+  $("auth-submit").textContent = submits[next];
+  $("auth-name-field").hidden = next !== "signup";
+  $("auth-confirm-field").hidden = next !== "signup";
+  $("auth-password-field").hidden = next === "reset";
+  $("auth-to-signup").hidden = next !== "signin";
+  $("auth-to-signin").hidden = next === "signin";
+  $("auth-to-reset").hidden = next !== "signin";
+  $("auth-error").hidden = true;
+  $("auth-info").hidden = true;
+}
+
+function showAuthError(message) {
+  $("auth-error").textContent = message;
+  $("auth-error").hidden = false;
+  $("auth-info").hidden = true;
+}
+
+async function submitAuth() {
+  const email = $("auth-email").value.trim();
+  const password = $("auth-password").value;
+  const submitBtn = $("auth-submit");
+
+  if (!email) { showAuthError("Please enter your email address."); return; }
+
+  submitBtn.disabled = true;
+  try {
+    if (authMode === "reset") {
+      await cloud.fns.sendPasswordResetEmail(cloud.auth, email);
+      $("auth-info").textContent = "Reset email sent — check your inbox (and spam folder), then sign in with your new password.";
+      $("auth-info").hidden = false;
+      $("auth-error").hidden = true;
+
+    } else if (authMode === "signup") {
+      const name = $("auth-name").value.trim();
+      const confirm = $("auth-confirm").value;
+      if (!name) { showAuthError("Please choose a display name."); submitBtn.disabled = false; return; }
+      if (password.length < 6) { showAuthError("Please choose a password of at least 6 characters."); submitBtn.disabled = false; return; }
+      if (password !== confirm) { showAuthError("The two passwords don't match."); submitBtn.disabled = false; return; }
+
+      // Creating the account signs the user in automatically
+      const cred = await cloud.fns.createUserWithEmailAndPassword(cloud.auth, email, password);
+      await cloud.fns.updateProfile(cred.user, { displayName: name });
+      await writeUserProfile(cred.user, name, true);
+      $("auth-modal").close();
+
+    } else {
+      const cred = await cloud.fns.signInWithEmailAndPassword(cloud.auth, email, password);
+      await writeUserProfile(cred.user, cred.user.displayName || "", false);
+      $("auth-modal").close();
+    }
+  } catch (err) {
+    showAuthError(authErrorMessage(err));
+  }
+  submitBtn.disabled = false;
+}
+
+/* Creates or refreshes users/{uid}. Only profile metadata is
+   stored — never passwords, never roles. */
+async function writeUserProfile(user, displayName, isNew) {
+  try {
+    const { doc, setDoc, serverTimestamp } = cloud.fns;
+    const payload = {
+      displayName: displayName || user.displayName || "",
+      email: user.email,
+      lastLoginAt: serverTimestamp()
+    };
+    if (isNew) payload.createdAt = serverTimestamp();
+    await setDoc(doc(cloud.db, "users", user.uid), payload, { merge: true });
+  } catch (err) {
+    console.warn("Could not update user profile document:", err);
+  }
+}
+
+async function signOutUser() {
+  if (cloud.dirty && isAdminUid(cloud.user?.uid)) await saveToCloud();   // don't lose admin work
+  await cloud.fns.signOut(cloud.auth);
+  closeAccountDropdown();
+}
+
+/* ------------------------------------------------------------
+   7. ACCESS CONTROL
    ------------------------------------------------------------ */
 function canEdit() {
-  return !cloud.configured || !!cloud.user;
+  return !cloud.configured || (!!cloud.user && isAdminUid(cloud.user.uid));
 }
 
 function applyAccessControl() {
   $("edit-mode-btn").hidden = !canEdit();
-  $("restore-cloud-btn").hidden = !(cloud.configured && cloud.user);
-  const adminBtn = $("admin-btn");
-  const status = $("admin-status");
-  if (!cloud.configured) {
-    adminBtn.hidden = true;
-    status.textContent = "";
-  } else if (cloud.user) {
-    adminBtn.hidden = false;
-    adminBtn.textContent = "Sign out";
-    status.textContent = `Signed in as ${cloud.user.email}`;
-  } else {
-    adminBtn.hidden = false;
-    adminBtn.textContent = "Admin sign in";
-    status.textContent = "";
+  $("restore-cloud-btn").hidden = !(cloud.configured && cloud.user && isAdminUid(cloud.user.uid));
+
+  // Header account controls
+  $("account-area").hidden = !cloud.configured;
+  if (cloud.configured) {
+    const signedIn = !!cloud.user;
+    $("auth-buttons").hidden = signedIn;
+    $("account-menu-wrap").hidden = !signedIn;
+    if (signedIn) {
+      $("account-name").textContent = cloud.user.displayName || cloud.user.email;
+    }
   }
+
   if (mode === "edit" && !canEdit()) setMode("idea");
+  refreshSaveButton();
 }
 
 function onAuthChanged(user) {
   cloud.user = user;
   applyAccessControl();
-  if (user) {
-    setSyncStatus(cloud.dirty ? "pending" : "ok", cloud.dirty ? "Unsaved changes — they will save automatically as you edit, or press Save Now." : "All changes saved");
-    if (cloud.dirty) $("retry-save-btn").hidden = true;
+  if (user && isAdminUid(user.uid)) {
+    setSyncStatus(cloud.dirty ? "pending" : "ok",
+      cloud.dirty ? "Unsaved changes — they save automatically as you edit, or press Save Now." : "All changes saved");
   }
 }
 
-async function handleAdminButton() {
-  if (cloud.user) {
-    if (!confirm("Sign out of the administrator account?")) return;
-    if (cloud.dirty) await saveToCloud();   // don't lose pending work on sign-out
-    await cloud.fns.signOut(cloud.auth);
-    return;
-  }
-  $("login-error").hidden = true;
-  $("login-email").value = "";
-  $("login-password").value = "";
-  $("login-modal").showModal();
-  $("login-email").focus();
+/* Account dropdown open/close */
+function toggleAccountDropdown() {
+  const dd = $("account-dropdown");
+  dd.hidden = !dd.hidden;
+  $("account-btn").setAttribute("aria-expanded", String(!dd.hidden));
 }
 
-async function submitLogin() {
-  const email = $("login-email").value.trim();
-  const password = $("login-password").value;
-  const errEl = $("login-error");
-  if (!email || !password) {
-    errEl.textContent = "Enter both email and password.";
-    errEl.hidden = false;
-    return;
-  }
-  $("login-submit").disabled = true;
-  try {
-    await cloud.fns.signInWithEmailAndPassword(cloud.auth, email, password);
-    $("login-modal").close();
-  } catch (err) {
-    errEl.textContent =
-      "Sign-in failed. Check the email and password. (" + (err.code || "unknown error") + ")";
-    errEl.hidden = false;
-  }
-  $("login-submit").disabled = false;
+function closeAccountDropdown() {
+  $("account-dropdown").hidden = true;
+  $("account-btn").setAttribute("aria-expanded", "false");
 }
 
 /* ------------------------------------------------------------
-   6. RENDERING — THE TAXONOMY GRID
+   8. SAVED EXPERIENCES (users/{uid}/savedExperiences/{id})
+   Structured content only — no raw HTML is ever stored.
+   ------------------------------------------------------------ */
+function experiencesCollection() {
+  const { collection } = cloud.fns;
+  return collection(cloud.db, "users", cloud.user.uid, "savedExperiences");
+}
+
+/* Snapshot of the current selections with STABLE ids, so a saved
+   experience survives renames and can be reloaded later. */
+function captureSelections() {
+  const sels = [];
+  if (mode === "inspire" && recipe) {
+    taxonomy.columns.forEach((col, c) => {
+      const r = recipe[c];
+      if (r >= 0 && taxonomy.rows[r][c].text.trim() !== "") {
+        const cell = taxonomy.rows[r][c];
+        sels.push({ columnId: col.id, columnName: col.name, valueId: cell.id, valueText: cell.text });
+      }
+    });
+  } else {
+    selectedCells.forEach((key) => {
+      const [r, c] = key.split(":").map(Number);
+      const cell = taxonomy.rows[r][c];
+      if (cell.text.trim() === "") return;
+      sels.push({ columnId: taxonomy.columns[c].id, columnName: taxonomy.columns[c].name, valueId: cell.id, valueText: cell.text });
+    });
+  }
+  return sels;
+}
+
+async function saveCurrentExperience() {
+  if (!cloud.user) { openAuthModal("signin"); return; }
+  if (!lastGeneration) return;
+  const btn = $("save-experience-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+  try {
+    const { addDoc, serverTimestamp } = cloud.fns;
+    await addDoc(experiencesCollection(), {
+      schemaVersion: EXPERIENCE_SCHEMA_VERSION,
+      title: lastGeneration.idea.title,
+      topic: lastGeneration.topic,
+      kind: lastGeneration.kind,                 // "full" | "spark"
+      notes: "",
+      favorite: false,
+      selections: lastGeneration.selections,
+      content: lastGeneration.idea,              // structured strings, no HTML
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    if (btn) { btn.textContent = "Saved ✓ — view in Saved Experiences"; }
+  } catch (err) {
+    console.error("Could not save experience:", err);
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Save Experience (failed — try again)"; }
+  }
+}
+
+/* ------------------------------------------------------------
+   9. EXPERIENCE LIBRARY UI
+   ------------------------------------------------------------ */
+let libraryItems = [];        // [{id, data}]
+let libraryOpenItem = null;   // the item shown in detail view
+
+async function openLibrary() {
+  closeAccountDropdown();
+  if (!cloud.user) { openAuthModal("signin"); return; }
+  $("library-list-view").hidden = false;
+  $("library-detail-view").hidden = true;
+  $("library-modal").showModal();
+  await reloadLibrary();
+}
+
+async function reloadLibrary() {
+  try {
+    const { getDocs, query, orderBy } = cloud.fns;
+    const snap = await getDocs(query(experiencesCollection(), orderBy("createdAt", "desc")));
+    libraryItems = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+  } catch (err) {
+    console.error("Could not load saved experiences:", err);
+    libraryItems = [];
+  }
+  renderLibraryList();
+}
+
+function renderLibraryList() {
+  const term = $("lib-search").value.trim().toLowerCase();
+  const sort = $("lib-sort").value;
+  const favOnly = $("lib-fav-only").checked;
+
+  let items = [...libraryItems];
+  if (favOnly) items = items.filter((it) => it.data.favorite);
+  if (term) {
+    items = items.filter((it) =>
+      `${it.data.title} ${it.data.topic} ${it.data.notes}`.toLowerCase().includes(term)
+    );
+  }
+  const created = (it) => it.data.createdAt?.toMillis?.() ?? 0;
+  if (sort === "newest") items.sort((a, b) => created(b) - created(a));
+  if (sort === "oldest") items.sort((a, b) => created(a) - created(b));
+  if (sort === "title") items.sort((a, b) => a.data.title.localeCompare(b.data.title));
+  if (sort === "favorite") items.sort((a, b) => (b.data.favorite ? 1 : 0) - (a.data.favorite ? 1 : 0) || created(b) - created(a));
+
+  const list = $("lib-list");
+  list.innerHTML = "";
+  $("lib-empty").hidden = items.length > 0;
+
+  items.forEach((it) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "lib-item";
+    const when = it.data.createdAt?.toMillis?.()
+      ? new Date(it.data.createdAt.toMillis()).toLocaleDateString()
+      : "";
+    row.innerHTML = `
+      <span class="lib-item-fav">${it.data.favorite ? "★" : "☆"}</span>
+      <span class="lib-item-main"><strong></strong><small></small></span>
+      <span class="lib-item-kind">${it.data.kind === "spark" ? "💡" : "✨"}</span>`;
+    row.querySelector("strong").textContent = it.data.title;
+    row.querySelector("small").textContent = `${it.data.topic} · ${when}`;
+    row.addEventListener("click", () => openLibraryDetail(it));
+    list.append(row);
+  });
+}
+
+function openLibraryDetail(item) {
+  libraryOpenItem = item;
+  const d = item.data;
+  $("library-list-view").hidden = true;
+  $("library-detail-view").hidden = false;
+  $("lib-title").value = d.title;
+  $("lib-notes").value = d.notes || "";
+  $("lib-fav").textContent = d.favorite ? "★" : "☆";
+  const fmt = (ts) => (ts?.toMillis?.() ? new Date(ts.toMillis()).toLocaleString() : "—");
+  $("lib-meta").textContent = `Topic: ${d.topic} · Created ${fmt(d.createdAt)} · Last edited ${fmt(d.updatedAt)}`;
+  $("lib-chips").innerHTML = (d.selections || [])
+    .map((s) => `<span class="chip">${escapeHTML(s.columnName)} · ${escapeHTML(s.valueText)}</span>`)
+    .join("");
+  $("lib-content").innerHTML = renderIdeaBody(d.content, d.kind);
+}
+
+async function saveLibraryChanges() {
+  if (!libraryOpenItem) return;
+  try {
+    const { doc, updateDoc, serverTimestamp } = cloud.fns;
+    const newTitle = $("lib-title").value.trim() || "Untitled experience";
+    const newNotes = $("lib-notes").value;
+    await updateDoc(doc(cloud.db, "users", cloud.user.uid, "savedExperiences", libraryOpenItem.id), {
+      title: newTitle,
+      notes: newNotes,
+      updatedAt: serverTimestamp()
+    });
+    libraryOpenItem.data.title = newTitle;
+    libraryOpenItem.data.notes = newNotes;
+    $("lib-save-changes").textContent = "Saved ✓";
+    setTimeout(() => ($("lib-save-changes").textContent = "Save Changes"), 1500);
+  } catch (err) {
+    alert("Could not save changes: " + err.message);
+  }
+}
+
+async function toggleLibraryFavorite() {
+  if (!libraryOpenItem) return;
+  try {
+    const { doc, updateDoc, serverTimestamp } = cloud.fns;
+    const next = !libraryOpenItem.data.favorite;
+    await updateDoc(doc(cloud.db, "users", cloud.user.uid, "savedExperiences", libraryOpenItem.id), {
+      favorite: next, updatedAt: serverTimestamp()
+    });
+    libraryOpenItem.data.favorite = next;
+    $("lib-fav").textContent = next ? "★" : "☆";
+  } catch (err) {
+    alert("Could not update favorite: " + err.message);
+  }
+}
+
+async function duplicateLibraryItem() {
+  if (!libraryOpenItem) return;
+  try {
+    const { addDoc, serverTimestamp } = cloud.fns;
+    const copy = structuredClone(libraryOpenItem.data);
+    copy.title = `${copy.title} (copy)`;
+    copy.favorite = false;
+    copy.createdAt = serverTimestamp();
+    copy.updatedAt = serverTimestamp();
+    await addDoc(experiencesCollection(), copy);
+    $("library-detail-view").hidden = true;
+    $("library-list-view").hidden = false;
+    await reloadLibrary();
+  } catch (err) {
+    alert("Could not duplicate: " + err.message);
+  }
+}
+
+async function deleteLibraryItem() {
+  if (!libraryOpenItem) return;
+  if (!confirm(`Delete “${libraryOpenItem.data.title}”? This cannot be undone.`)) return;
+  try {
+    const { doc, deleteDoc } = cloud.fns;
+    await deleteDoc(doc(cloud.db, "users", cloud.user.uid, "savedExperiences", libraryOpenItem.id));
+    libraryOpenItem = null;
+    $("library-detail-view").hidden = true;
+    $("library-list-view").hidden = false;
+    await reloadLibrary();
+  } catch (err) {
+    alert("Could not delete: " + err.message);
+  }
+}
+
+/* Maps saved selections (stable ids, name fallbacks) back onto the
+   CURRENT taxonomy and selects them in Design Ideas mode. */
+function loadSelectionsIntoGenerator(saved) {
+  setMode("idea");
+  selectedCells.clear();
+  lockedSelection.clear();
+  (saved.selections || []).forEach((s) => {
+    let c = taxonomy.columns.findIndex((col) => col.id === s.columnId);
+    if (c < 0) c = taxonomy.columns.findIndex((col) => col.name === s.columnName);
+    if (c < 0) return;
+    let r = taxonomy.rows.findIndex((row) => row[c].id === s.valueId);
+    if (r < 0) r = taxonomy.rows.findIndex((row) => row[c].text === s.valueText);
+    if (r < 0) return;
+    selectedCells.add(`${r}:${c}`);
+  });
+  $("topic-input").value = saved.topic || "";
+  renderTable();
+}
+
+function libraryLoad() {
+  if (!libraryOpenItem) return;
+  loadSelectionsIntoGenerator(libraryOpenItem.data);
+  $("library-modal").close();
+}
+
+/* Regenerate from the same recipe: a fresh variation appears in the
+   generator; saving it creates a separate library entry. */
+function libraryRegenerate() {
+  if (!libraryOpenItem) return;
+  const kind = libraryOpenItem.data.kind || "full";
+  loadSelectionsIntoGenerator(libraryOpenItem.data);
+  $("library-modal").close();
+  generateIdea(kind);
+}
+
+/* ------------------------------------------------------------
+   10. RENDERING — THE TAXONOMY GRID
    ------------------------------------------------------------ */
 function refreshWorkspace() {
   if (mode === "inspire") {
-    recipe = null;           // taxonomy may have changed shape
+    recipe = null;
     lockedColumns.clear();
     newRecipe();
   } else {
@@ -578,7 +924,6 @@ function renderTable() {
     const th = document.createElement("th");
 
     if (mode === "edit") {
-      // Editable name + ✎ description editor + × delete
       const wrap = document.createElement("div");
       wrap.className = "header-cell";
 
@@ -597,7 +942,7 @@ function renderTable() {
       edit.className = "delete-btn";
       edit.title = `Edit the description of “${col.name}”`;
       edit.textContent = "✎";
-      edit.addEventListener("click", () => openDescriptionEditor(colIndex));
+      edit.addEventListener("click", () => openEditor({ type: "column", c: colIndex }));
 
       const del = document.createElement("button");
       del.className = "delete-btn";
@@ -608,16 +953,14 @@ function renderTable() {
       wrap.append(name, edit, del);
       th.append(wrap);
     } else {
-      // Clickable header: opens the category description modal.
-      // (Clicking a header never selects cells — that's cells only.)
       th.className = "th-info";
       th.tabIndex = 0;
       th.setAttribute("role", "button");
       th.setAttribute("aria-label", `About the ${col.name} dimension`);
-      if (col.shortDescription) th.title = col.shortDescription;   // hover tooltip
+      if (col.shortDescription) th.title = col.shortDescription;
       th.innerHTML = `<span class="th-label"></span> <span class="info-icon" aria-hidden="true">ⓘ</span>`;
       th.querySelector(".th-label").textContent = col.name;
-      const open = () => openDescriptionModal(colIndex);
+      const open = () => openInfoModal({ type: "column", c: colIndex });
       th.addEventListener("click", open);
       th.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
@@ -627,7 +970,6 @@ function renderTable() {
     headRow.append(th);
   });
 
-  // Extra empty header over the row-delete column (Edit Mode only)
   if (mode === "edit") {
     const spacer = document.createElement("th");
     spacer.className = "row-tools";
@@ -637,29 +979,63 @@ function renderTable() {
   thead.append(headRow);
   table.append(thead);
 
-  /* ----- Body rows (the possibilities) ----- */
+  /* ----- Body rows (the values) ----- */
   const tbody = document.createElement("tbody");
 
   taxonomy.rows.forEach((row, rowIndex) => {
     const tr = document.createElement("tr");
 
-    row.forEach((cellText, colIndex) => {
+    row.forEach((cell, colIndex) => {
       const td = document.createElement("td");
 
       if (mode === "edit") {
-        td.contentEditable = "true";
-        td.spellcheck = false;
-        td.textContent = cellText;
-        td.addEventListener("blur", () => {
-          taxonomy.rows[rowIndex][colIndex] = td.textContent.trim();
+        // Editable text + a ✎ button for the value's descriptions
+        td.className = "edit-cell";
+        const text = document.createElement("span");
+        text.className = "cell-text";
+        text.contentEditable = "true";
+        text.spellcheck = false;
+        text.textContent = cell.text;
+        text.addEventListener("blur", () => {
+          cell.text = text.textContent.trim();   // id + descriptions stay
           markChanged();
         });
+
+        const edit = document.createElement("button");
+        edit.className = "cell-info-btn";
+        edit.title = `Edit the description of “${cell.text || "this value"}”`;
+        edit.textContent = "✎";
+        edit.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openEditor({ type: "value", c: colIndex, r: rowIndex });
+        });
+
+        td.append(text, edit);
       } else {
-        td.textContent = cellText;
+        // Selectable value + ⓘ info button (info never changes selection)
         td.className = "selectable";
         const key = `${rowIndex}:${colIndex}`;
         if (selectedCells.has(key)) td.classList.add("is-selected");
         if (lockedSelection.has(key)) td.classList.add("is-locked-cell");
+
+        const label = document.createElement("span");
+        label.className = "cell-text";
+        label.textContent = cell.text;
+        td.append(label);
+
+        if (cell.text.trim() !== "") {
+          const info = document.createElement("button");
+          info.className = "cell-info-btn";
+          info.setAttribute("aria-label", `About ${cell.text}`);
+          if (cell.shortDescription) info.title = cell.shortDescription;
+          info.textContent = "ⓘ";
+          info.addEventListener("click", (e) => {
+            e.stopPropagation();   // the ⓘ opens info; it never selects
+            openInfoModal({ type: "value", c: colIndex, r: rowIndex });
+          });
+          td.append(info);
+        }
+
         td.addEventListener("click", () => toggleCell(key, td));
       }
 
@@ -687,7 +1063,6 @@ function renderTable() {
   updateSelectionSummary();
 }
 
-/* Status line + lock button label under the Design Ideas toolbar */
 function updateSelectionSummary() {
   const el = $("selection-summary");
   const count = selectedCells.size;
@@ -695,7 +1070,7 @@ function updateSelectionSummary() {
 
   let text =
     count === 0
-      ? "No cells selected yet — click cells in the framework below, or use Randomize. Click a column heading (ⓘ) to learn what it means."
+      ? "No cells selected yet — click cells in the framework below, or use Randomize. ⓘ opens a value's meaning without selecting it."
       : `${count} cell${count === 1 ? "" : "s"} selected.`;
   if (locked > 0) text += ` ${locked} locked — Randomize fills only the unlocked dimensions.`;
   el.textContent = text;
@@ -705,7 +1080,7 @@ function updateSelectionSummary() {
 }
 
 /* ------------------------------------------------------------
-   7. RENDERING — THE RECIPE BOARD (Inspiration Mode)
+   11. RENDERING — THE RECIPE BOARD (Inspiration Mode)
    ------------------------------------------------------------ */
 function renderRecipeBoard() {
   const board = $("recipe-board");
@@ -714,7 +1089,7 @@ function renderRecipeBoard() {
 
   taxonomy.columns.forEach((col, colIndex) => {
     const rowIndex = recipe[colIndex];
-    const value = rowIndex >= 0 ? taxonomy.rows[rowIndex][colIndex] : "—";
+    const cell = rowIndex >= 0 ? taxonomy.rows[rowIndex][colIndex] : null;
     const locked = lockedColumns.has(colIndex);
 
     const card = document.createElement("div");
@@ -726,11 +1101,14 @@ function renderRecipeBoard() {
     dim.title = col.shortDescription || `About ${col.name}`;
     dim.innerHTML = `<span></span> <span class="info-icon" aria-hidden="true">ⓘ</span>`;
     dim.querySelector("span").textContent = col.name;
-    dim.addEventListener("click", () => openDescriptionModal(colIndex));
+    dim.addEventListener("click", () => openInfoModal({ type: "column", c: colIndex }));
 
-    const val = document.createElement("div");
-    val.className = "recipe-value";
-    val.textContent = value;
+    const val = document.createElement("button");
+    val.className = "recipe-value recipe-value-btn";
+    val.type = "button";
+    val.textContent = cell ? cell.text : "—";
+    if (cell && cell.shortDescription) val.title = cell.shortDescription;
+    if (cell) val.addEventListener("click", () => openInfoModal({ type: "value", c: colIndex, r: rowIndex }));
 
     const actions = document.createElement("div");
     actions.className = "recipe-actions";
@@ -762,75 +1140,146 @@ function updateLockSummary() {
 }
 
 /* ------------------------------------------------------------
-   8. CATEGORY DESCRIPTION MODAL + EDITOR
+   12. DESCRIPTION VIEWER + EDITOR
+   One pair of dialogs serves both columns and values.
+   target = { type: "column"|"value", c, r? }
    ------------------------------------------------------------ */
+function targetRecord(target) {
+  return target.type === "column"
+    ? taxonomy.columns[target.c]
+    : taxonomy.rows[target.r][target.c];
+}
 
-/* Read-only modal (Idea/Inspiration modes) */
-function openDescriptionModal(colIndex) {
-  const col = taxonomy.columns[colIndex];
-  $("desc-modal-title").textContent = col.name;
+function openInfoModal(target) {
+  const rec = targetRecord(target);
+  const isValue = target.type === "value";
+  $("desc-modal-context").hidden = !isValue;
+  if (isValue) $("desc-modal-context").textContent = taxonomy.columns[target.c].name;
+  $("desc-modal-title").textContent = isValue ? rec.text : rec.name;
   $("desc-modal-short").textContent =
-    col.shortDescription || "No description has been written for this category yet.";
-  $("desc-modal-detail").textContent = col.detailedDescription;
-  $("desc-modal-detail-wrap").hidden = !col.detailedDescription;
-  $("desc-modal-example").textContent = col.example;
-  $("desc-modal-example-wrap").hidden = !col.example;
+    rec.shortDescription || "No description has been written for this yet.";
+  $("desc-modal-detail").textContent = rec.detailedDescription;
+  $("desc-modal-detail-wrap").hidden = !rec.detailedDescription;
+  $("desc-modal-example").textContent = rec.example;
+  $("desc-modal-example-wrap").hidden = !rec.example;
   $("desc-modal").showModal();
 }
 
-/* Editor dialog (Edit mode) — Save / Cancel, with a guard against
-   accidentally losing changes on Cancel or Escape. */
-let editingColIndex = null;
+let editingTarget = null;
 
-function openDescriptionEditor(colIndex) {
-  editingColIndex = colIndex;
-  const col = taxonomy.columns[colIndex];
-  $("desc-editor-title").textContent = `Edit “${col.name}”`;
-  $("edit-cat-name").value = col.name;
-  $("edit-cat-short").value = col.shortDescription;
-  $("edit-cat-detail").value = col.detailedDescription;
-  $("edit-cat-example").value = col.example;
+function openEditor(target) {
+  editingTarget = target;
+  const rec = targetRecord(target);
+  const isValue = target.type === "value";
+  $("desc-editor-title").textContent = isValue
+    ? `Edit value in “${taxonomy.columns[target.c].name}”`
+    : `Edit “${rec.name}”`;
+  $("edit-cat-name-label").textContent = isValue ? "Value text" : "Category name";
+  $("edit-cat-name").value = isValue ? rec.text : rec.name;
+  $("edit-cat-short").value = rec.shortDescription;
+  $("edit-cat-detail").value = rec.detailedDescription;
+  $("edit-cat-example").value = rec.example;
   $("desc-editor").showModal();
 }
 
 function editorIsDirty() {
-  if (editingColIndex === null) return false;
-  const col = taxonomy.columns[editingColIndex];
+  if (!editingTarget) return false;
+  const rec = targetRecord(editingTarget);
+  const currentName = editingTarget.type === "value" ? rec.text : rec.name;
   return (
-    $("edit-cat-name").value.trim() !== col.name ||
-    $("edit-cat-short").value.trim() !== col.shortDescription ||
-    $("edit-cat-detail").value.trim() !== col.detailedDescription ||
-    $("edit-cat-example").value.trim() !== col.example
+    $("edit-cat-name").value.trim() !== currentName ||
+    $("edit-cat-short").value.trim() !== rec.shortDescription ||
+    $("edit-cat-detail").value.trim() !== rec.detailedDescription ||
+    $("edit-cat-example").value.trim() !== rec.example
   );
 }
 
-function saveDescriptionEditor() {
-  const col = taxonomy.columns[editingColIndex];
-  col.name = $("edit-cat-name").value.trim() || "Untitled";   // id stays stable
-  col.shortDescription = $("edit-cat-short").value.trim();
-  col.detailedDescription = $("edit-cat-detail").value.trim();
-  col.example = $("edit-cat-example").value.trim();
+function saveEditor() {
+  const rec = targetRecord(editingTarget);
+  const name = $("edit-cat-name").value.trim();
+  if (editingTarget.type === "value") {
+    rec.text = name;                                  // may be empty; id stays stable
+  } else {
+    rec.name = name || "Untitled";
+  }
+  rec.shortDescription = $("edit-cat-short").value.trim();
+  rec.detailedDescription = $("edit-cat-detail").value.trim();
+  rec.example = $("edit-cat-example").value.trim();
   $("desc-editor").close();
-  editingColIndex = null;
+  editingTarget = null;
   markChanged();
   renderTable();
 }
 
-function cancelDescriptionEditor() {
-  if (editorIsDirty() && !confirm("Discard your changes to this category?")) return;
+function cancelEditor() {
+  if (editorIsDirty() && !confirm("Discard your changes?")) return;
   $("desc-editor").close();
-  editingColIndex = null;
+  editingTarget = null;
 }
 
 /* ------------------------------------------------------------
-   9. EDIT MODE ACTIONS
+   13. TAXONOMY SEARCH
+   Searches category names, value names, all descriptions, and
+   examples. Selecting a result opens its information dialog.
+   ------------------------------------------------------------ */
+function searchTaxonomy(term) {
+  const t = term.toLowerCase();
+  const results = [];
+  taxonomy.columns.forEach((col, c) => {
+    const hay = `${col.name} ${col.shortDescription} ${col.detailedDescription} ${col.example}`.toLowerCase();
+    if (hay.includes(t)) {
+      results.push({ type: "column", c, label: col.name, context: "Category", snippet: col.shortDescription });
+    }
+  });
+  taxonomy.rows.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      if (cell.text.trim() === "") return;
+      const hay = `${cell.text} ${cell.shortDescription} ${cell.detailedDescription} ${cell.example}`.toLowerCase();
+      if (hay.includes(t)) {
+        results.push({ type: "value", c, r, label: cell.text, context: taxonomy.columns[c].name, snippet: cell.shortDescription });
+      }
+    });
+  });
+  return results.slice(0, 10);
+}
+
+function renderSearchResults() {
+  const term = $("search-input").value.trim();
+  const box = $("search-results");
+  if (term.length < 2) { box.hidden = true; box.innerHTML = ""; return; }
+
+  const results = searchTaxonomy(term);
+  box.innerHTML = "";
+  if (results.length === 0) {
+    box.innerHTML = `<p class="search-empty">No matches.</p>`;
+  } else {
+    results.forEach((res) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "search-result";
+      btn.setAttribute("role", "option");
+      btn.innerHTML = `<span class="search-context"></span><strong></strong><small></small>`;
+      btn.querySelector(".search-context").textContent = res.context;
+      btn.querySelector("strong").textContent = res.label;
+      btn.querySelector("small").textContent = res.snippet || "";
+      btn.addEventListener("click", () => {
+        box.hidden = true;
+        openInfoModal(res.type === "column" ? { type: "column", c: res.c } : { type: "value", c: res.c, r: res.r });
+      });
+      box.append(btn);
+    });
+  }
+  box.hidden = false;
+}
+
+/* ------------------------------------------------------------
+   14. EDIT MODE ACTIONS
    ------------------------------------------------------------ */
 function addRow() {
-  taxonomy.rows.push(taxonomy.columns.map(() => ""));
+  taxonomy.rows.push(taxonomy.columns.map(() => makeCell()));   // blank descriptions auto-created
   afterStructureChange();
 }
 
-/* New columns automatically get an empty description record */
 function addColumn() {
   const name = `New Dimension ${taxonomy.columns.length + 1}`;
   taxonomy.columns.push({
@@ -840,7 +1289,7 @@ function addColumn() {
     detailedDescription: "",
     example: ""
   });
-  taxonomy.rows.forEach((row) => row.push(""));
+  taxonomy.rows.forEach((row) => row.push(makeCell()));
   afterStructureChange();
 }
 
@@ -849,18 +1298,18 @@ function deleteRow(rowIndex) {
     alert("The framework needs at least one row.");
     return;
   }
+  if (!confirm("Delete this row? Its values and their descriptions will be removed.")) return;
   taxonomy.rows.splice(rowIndex, 1);
   afterStructureChange();
 }
 
-/* Deleting a column deletes its description too — confirm first */
 function deleteColumn(colIndex) {
   if (taxonomy.columns.length <= 1) {
     alert("The framework needs at least one column.");
     return;
   }
   const col = taxonomy.columns[colIndex];
-  if (!confirm(`Delete the column “${col.name}” and its description? This cannot be undone here.`)) return;
+  if (!confirm(`Delete the column “${col.name}”? Its description and all of its values' descriptions will be removed.`)) return;
   taxonomy.columns.splice(colIndex, 1);
   taxonomy.rows.forEach((row) => row.splice(colIndex, 1));
   afterStructureChange();
@@ -873,15 +1322,12 @@ function resetSelections() {
   lockedColumns.clear();
 }
 
-/* When rows/columns change shape, selections and recipes may point
-   at cells that no longer exist — reset them all. */
 function afterStructureChange() {
   resetSelections();
   markChanged();
   renderTable();
 }
 
-/* Download the current taxonomy (v2, with descriptions) as JSON */
 function exportJSON() {
   const blob = new Blob([JSON.stringify(taxonomy, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -892,20 +1338,17 @@ function exportJSON() {
   URL.revokeObjectURL(url);
 }
 
-/* Import: validate → preview/confirm → apply. Never silently
-   overwrites cloud data — applying goes through the normal save
-   flow, and the confirmation says so. */
 function importJSON(file) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
       const raw = JSON.parse(reader.result);
-      const tax = normalizeTaxonomy(raw);
+      const tax = normalizeTaxonomy(raw.taxonomy || raw);
       if (!tax) {
         alert(
           "That file doesn't look like a valid taxonomy.\n\n" +
-          "Expected either the current format (schemaVersion 2 with column objects) " +
-          'or the older { "columns": ["..."], "rows": [["..."]] } format.'
+          "Accepted formats: the current schema (v3), the previous column-object schema (v2), " +
+          'or the original { "columns": ["..."], "rows": [["..."]] } format.'
         );
         return;
       }
@@ -914,14 +1357,14 @@ function importJSON(file) {
         `Columns (${tax.columns.length}): ${tax.columns.map((c) => c.name).join(", ")}\n` +
         `Rows: ${tax.rows.length}\n\n` +
         `This replaces the taxonomy on screen` +
-        (cloud.configured && cloud.user ? ` and will be saved to the cloud automatically.` : `.`);
+        (cloud.configured && cloud.user && isAdminUid(cloud.user.uid)
+          ? ` and will be saved to the cloud automatically.` : `.`);
       if (!confirm(preview)) return;
 
       taxonomy = tax;
       resetSelections();
       markChanged();
       renderTable();
-      setSyncStatus(cloud.configured && cloud.user ? "info" : "local", "Imported ✓");
     } catch {
       alert("Could not read that file as JSON.");
     }
@@ -930,22 +1373,18 @@ function importJSON(file) {
 }
 
 function resetToDefault() {
-  const sure = confirm("Reset to the default starter taxonomy? This replaces your current framework.");
-  if (!sure) return;
-  taxonomy = structuredClone(DEFAULT_TAXONOMY);
+  if (!confirm("Reset to the default starter taxonomy? This replaces your current framework.")) return;
+  taxonomy = buildDefaultTaxonomy();
   afterStructureChange();
 }
 
 /* ------------------------------------------------------------
-   10. DESIGN IDEAS MODE ACTIONS
+   15. DESIGN IDEAS MODE ACTIONS
    ------------------------------------------------------------ */
-
-/* Toggles one cell in place (no full re-render) so the selection
-   animation only plays on the cell that was actually clicked. */
 function toggleCell(key, td) {
   if (selectedCells.has(key)) {
     selectedCells.delete(key);
-    lockedSelection.delete(key);   // deselecting also unlocks it
+    lockedSelection.delete(key);
     td.classList.remove("is-selected", "is-locked-cell");
   } else {
     selectedCells.add(key);
@@ -954,16 +1393,14 @@ function toggleCell(key, td) {
   updateSelectionSummary();
 }
 
-/* Row indexes that have a non-empty value in the given column */
 function rowsWithValue(colIndex) {
   const candidates = [];
   taxonomy.rows.forEach((row, rowIndex) => {
-    if (row[colIndex].trim() !== "") candidates.push(rowIndex);
+    if (row[colIndex].text.trim() !== "") candidates.push(rowIndex);
   });
   return candidates;
 }
 
-/* The first (top-most) locked cell in a column, or null */
 function lockedCellInColumn(colIndex) {
   for (let r = 0; r < taxonomy.rows.length; r++) {
     if (lockedSelection.has(`${r}:${colIndex}`)) return `${r}:${colIndex}`;
@@ -971,12 +1408,9 @@ function lockedCellInColumn(colIndex) {
   return null;
 }
 
-/* Lock Selection: protects the current selection from Randomize.
-   If a column has multiple selected cells, only the first is kept
-   (a recipe needs exactly one value per dimension). */
 function toggleSelectionLock() {
   if (lockedSelection.size > 0) {
-    lockedSelection.clear();          // acting as "Unlock Selection"
+    lockedSelection.clear();
     renderTable();
     return;
   }
@@ -992,10 +1426,10 @@ function toggleSelectionLock() {
       const key = `${r}:${colIndex}`;
       if (!selectedCells.has(key)) continue;
       if (!keptOne) {
-        lockedSelection.add(key);     // first selected cell in this column wins
+        lockedSelection.add(key);
         keptOne = true;
       } else {
-        selectedCells.delete(key);    // extra cells in the same column are dropped
+        selectedCells.delete(key);
         trimmed++;
       }
     }
@@ -1008,27 +1442,20 @@ function toggleSelectionLock() {
   }
 }
 
-/* Randomize Selection: builds a COMPLETE recipe — exactly one cell
-   per column. Locked cells keep their column; every other column
-   (with at least one usable value) gets one random cell. */
+/* Randomize: a COMPLETE recipe — exactly one cell per column,
+   locked columns kept, columns with no usable values skipped. */
 function randomizeSelection() {
   const next = new Set();
   taxonomy.columns.forEach((_, colIndex) => {
     const locked = lockedCellInColumn(colIndex);
-    if (locked) {
-      next.add(locked);               // locked column: keep the chosen cell
-      return;
-    }
+    if (locked) { next.add(locked); return; }
     const candidates = rowsWithValue(colIndex);
     if (candidates.length > 0) next.add(`${pick(candidates)}:${colIndex}`);
-    // columns with no usable values are skipped — nothing to select
   });
   selectedCells = next;
   renderTable();
 }
 
-/* Generate From Random Path: same complete-recipe fill (respecting
-   locks), then immediately generates a full experience. */
 function randomPath() {
   randomizeSelection();
   generateIdea("full");
@@ -1042,15 +1469,13 @@ function clearSelection() {
 }
 
 /* ------------------------------------------------------------
-   11. INSPIRATION MODE ACTIONS
+   16. INSPIRATION MODE ACTIONS
    ------------------------------------------------------------ */
-
-/* Rolls a fresh recipe, keeping any locked columns as they are */
 function newRecipe() {
   const previous = recipe;
   recipe = taxonomy.columns.map((_, colIndex) => {
     if (lockedColumns.has(colIndex) && previous && previous[colIndex] >= 0) {
-      return previous[colIndex];   // locked: keep the existing choice
+      return previous[colIndex];
     }
     const candidates = rowsWithValue(colIndex);
     return candidates.length > 0 ? pick(candidates) : -1;
@@ -1058,13 +1483,12 @@ function newRecipe() {
   renderRecipeBoard();
 }
 
-/* Rerolls a single column (tries to land on a different value) */
 function rerollColumn(colIndex) {
   const candidates = rowsWithValue(colIndex);
   if (candidates.length === 0) return;
   const others = candidates.filter((r) => r !== recipe[colIndex]);
   recipe[colIndex] = others.length > 0 ? pick(others) : candidates[0];
-  lockedColumns.delete(colIndex);   // rerolling implies you want it unlocked
+  lockedColumns.delete(colIndex);
   renderRecipeBoard();
 }
 
@@ -1078,11 +1502,15 @@ function toggleColumnLock(colIndex) {
 }
 
 /* ------------------------------------------------------------
-   12. THE IDEA GENERATOR — KNOWLEDGE MAPS
-   Keyed by column NAME: if a column is renamed, its values fall
-   back to generic wording (the description record survives via
-   the stable column id).
+   17. THE IDEA GENERATOR
+   The generator now reads the DESCRIPTIONS of both the selected
+   values and their categories — the same editable text shown in
+   the info dialogs — so ideas are interpreted, not concatenated.
+   Everything runs locally.
    ------------------------------------------------------------ */
+
+/* Generic fallback role per default dimension (used only when a
+   custom column has no description of its own) */
 const COLUMN_ROLES = {
   "Interactivity": "what participants do",
   "Embodiment": "how present participants feel",
@@ -1096,89 +1524,74 @@ const COLUMN_ROLES = {
   "Tech": "the platform assumptions"
 };
 
-const INTERPRETATIONS = {
-  "Interactivity": {
-    "Passive": "participants primarily observe as the experience unfolds around them",
-    "Interactive": "participants make simple choices that visibly change the moment",
-    "Problem Solving": "participants solve puzzles and challenges to move forward",
-    "Physicalized": "participants act through movement and embodied action",
-    "Interpersonal": "participants interact socially — other people are the core interface"
-  },
-  "Embodiment": {
-    "Detached": "participants view the world from outside it, like studying a living diorama",
-    "Observer": "participants stand inside the world but remain unseen by it",
-    "First Person POV": "participants inhabit the world through their own eyes",
-    "Movement Control": "participants' physical movement is tracked and mirrored in the world",
-    "Human to Human": "presence comes from real people responding to real people"
-  },
-  "Co-Participation": {
-    "Single Person": "a solo experience tuned for individual focus and pacing",
-    "One on One": "an intimate pairing — one participant with one partner or guide",
-    "Group": "a small group shares the experience and shapes it together",
-    "MMO": "many participants inhabit the same persistent world at once",
-    "Secondary Perspective": "some participants act while others watch and influence from a second vantage point"
-  },
-  "Story": {
-    "None": "no imposed narrative — meaning emerges from what participants do",
-    "Setting": "a rich setting implies a story without dictating one",
-    "Pre-created": "a crafted narrative carries participants from beginning to end",
-    "Choose your own": "branching paths let participants steer where the narrative goes",
-    "Adaptive Story": "the story quietly reshapes itself around participant behavior"
-  },
-  "Dynamics": {
-    "Predetermined": "events run on rails, giving the designer full control of pacing and reveals",
-    "Choice": "discrete decision points hand participants agency at key beats",
-    "Free Will": "participants act freely and the system responds to whatever they try",
-    "Conversational Reality": "the world negotiates with participants through open-ended dialogue",
-    "Adjustible POV": "participants can shift their point of view to see the system from new angles"
-  },
-  "Motivation": {
-    "None": "engagement rides on curiosity alone — no external incentives",
-    "Basic Mechanics": "simple, satisfying mechanics keep hands and minds engaged",
-    "Challenge": "difficulty itself is the draw, so mastery feels earned",
-    "Reinforcement": "steady feedback loops reward every bit of progress",
-    "Reward System": "explicit rewards give structure to long-term engagement"
-  },
-  "Meta Control": {
-    "None": "participants play within the world exactly as designed",
-    "Journey": "participants control their own path through the world, not the world itself",
-    "Character": "participants shape who they are within the world",
-    "World Editor": "participants can modify parts of the world as they go",
-    "World Builder": "participants construct the world itself — creation is the experience"
-  },
-  "Learning": {
-    "Elemental": "knowledge arrives in small foundational pieces that stack",
-    "Explicit": "learning goals are named openly and taught directly",
-    "Implicit": "learning happens through doing — absorbed rather than taught",
-    "Recall": "participants retrieve and apply what they already know",
-    "Sythensis": "participants combine ideas into something new of their own"
-  },
-  "Data": {
-    "Anonymous": "no participant data is kept — every session starts clean",
-    "Identity": "the experience knows who participants are and greets them accordingly",
-    "In-session": "behavior is tracked within a session so the experience adapts in the moment",
-    "Personalized": "a persistent profile tailors the experience across visits",
-    "Biometric": "physiological signals — heart rate, gaze, motion — tune the experience live"
-  },
-  "Tech": {
-    "none": "no technology at all — a fully physical, analog experience",
-    "2D": "a screen-based experience on ordinary displays",
-    "AR": "digital content overlaid onto the real world",
-    "VR": "a fully immersive simulated space",
-    "XR": "a mixed system spanning physical and digital space"
-  }
-};
-
-function interpret(col, value) {
-  const map = INTERPRETATIONS[col];
-  if (map && map[value]) return map[value];
-  const role = COLUMN_ROLES[col] || "a key aspect of the design";
-  return `“${value}” defines ${role}`;
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/* ------------------------------------------------------------
-   13. THE IDEA GENERATOR — TOPIC ANALYSIS
-   ------------------------------------------------------------ */
+function pickSome(arr, n) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
+
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/* Turns a stored description sentence into a mid-sentence phrase:
+   lowercases the first letter and strips the trailing period. */
+function asClause(sentence) {
+  const s = sentence.trim().replace(/\.$/, "");
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+function naturalJoin(items) {
+  if (items.length <= 1) return items.join("");
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function escapeHTML(text) {
+  const div = document.createElement("div");
+  div.textContent = String(text ?? "");
+  return div.innerHTML;
+}
+
+/* Collects the chosen CELLS grouped by column name */
+function buildGroups() {
+  const groups = {};
+
+  if (mode === "inspire") {
+    if (!recipe) return groups;
+    taxonomy.columns.forEach((col, colIndex) => {
+      const rowIndex = recipe[colIndex];
+      if (rowIndex < 0) return;
+      const cell = taxonomy.rows[rowIndex][colIndex];
+      if (cell.text.trim() !== "") groups[col.name] = [cell];
+    });
+  } else {
+    selectedCells.forEach((key) => {
+      const [r, c] = key.split(":").map(Number);
+      const cell = taxonomy.rows[r][c];
+      if (cell.text.trim() === "") return;
+      const colName = taxonomy.columns[c].name;
+      if (!groups[colName]) groups[colName] = [];
+      groups[colName].push(cell);
+    });
+  }
+
+  return groups;
+}
+
+function proseCells(cells = []) {
+  return cells.filter((cell) => cell.text.toLowerCase() !== "none");
+}
+
+/* --- Topic analysis: matches the topic against domain profiles
+   so generated ideas use vocabulary that fits the subject --- */
 const DOMAIN_PROFILES = [
   {
     keywords: ["cook", "food", "recipe", "kitchen", "bak", "cuisine", "chef", "meal", "taste", "dining"],
@@ -1288,83 +1701,35 @@ function analyzeTopic(topic) {
   return GENERIC_PROFILE;
 }
 
-/* ------------------------------------------------------------
-   14. THE IDEA GENERATOR — COMPOSING & RENDERING
-   ------------------------------------------------------------ */
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-/* Picks n DIFFERENT items from an array (or fewer if it's short) */
-function pickSome(arr, n) {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {   // Fisher–Yates shuffle
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy.slice(0, n);
-}
-
-function capitalize(text) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/* Join words naturally — "A", "A and B", "A, B, and C" */
-function naturalJoin(items) {
-  if (items.length <= 1) return items.join("");
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
-}
-
-function escapeHTML(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-/* Collects the chosen elements as { columnName: [values] } —
-   from the recipe in Inspiration mode, from selected cells otherwise. */
-function buildGroups() {
-  const groups = {};
-
-  if (mode === "inspire") {
-    if (!recipe) return groups;
-    taxonomy.columns.forEach((col, colIndex) => {
-      const rowIndex = recipe[colIndex];
-      if (rowIndex < 0) return;
-      const value = taxonomy.rows[rowIndex][colIndex].trim();
-      if (value !== "") groups[col.name] = [value];
-    });
-  } else {
-    selectedCells.forEach((key) => {
-      const [r, c] = key.split(":").map(Number);
-      const colName = taxonomy.columns[c].name;
-      const value = taxonomy.rows[r][c].trim();
-      if (value === "") return;
-      if (!groups[colName]) groups[colName] = [];
-      groups[colName].push(value);
-    });
-  }
-
-  return groups;
-}
-
-/* Values like "none" read badly inside prose; the rationale section
-   still lists every chosen element faithfully. */
-function proseValues(values = []) {
-  return values.filter((v) => v.toLowerCase() !== "none");
-}
-
-/* Composes a complete idea object from the topic + chosen elements.
-   Every field mixes randomized sentence templates with the
-   interpretation maps, so regenerating gives fresh variations. */
+/* Composes a complete idea object (plain strings only — this is
+   exactly what gets stored when a user saves the experience). */
 function composeIdea(topic, groups, profile) {
   const columnNames = Object.keys(groups);
-  const allValues = proseValues(columnNames.flatMap((c) => groups[c]));
-  const signature = allValues.length > 0 ? pick(allValues) : "Immersive";
+  const columnByName = Object.fromEntries(taxonomy.columns.map((c) => [c.name, c]));
 
-  const v = (col) => (groups[col] || [])[0] || null;
-  const meaning = (col, fallback) => (v(col) ? interpret(col, v(col)) : fallback);
+  const allCells = proseCells(columnNames.flatMap((c) => groups[c]));
+  const signature = allCells.length > 0 ? pick(allCells).text : "Immersive";
+
+  // First chosen cell in a dimension (skipping "none"-style values)
+  const cellOf = (col) => proseCells(groups[col] || [])[0] || null;
+
+  /* The heart of the smarter generator: the meaning of a chosen
+     value is its EDITED short description; the meaning of its
+     dimension is the category's short description. Both fall back
+     gracefully for custom content. */
+  const valueMeaning = (col, fallback) => {
+    const cell = cellOf(col);
+    if (!cell) return fallback;
+    if (cell.shortDescription) return asClause(cell.shortDescription);
+    const role = columnByName[col]?.shortDescription
+      ? asClause(columnByName[col].shortDescription)
+      : (COLUMN_ROLES[col] || "a key aspect of the design");
+    return `“${cell.text}” shapes ${role}`;
+  };
+  const columnMeaning = (col) => {
+    const c = columnByName[col];
+    return c?.shortDescription ? asClause(c.shortDescription) : (COLUMN_ROLES[col] || "a key dimension of the design");
+  };
 
   const [actionA, actionB] = pickSome(profile.actions, 2);
 
@@ -1376,47 +1741,65 @@ function composeIdea(topic, groups, profile) {
   ]);
 
   const pitch = pick([
-    `An immersive take on ${topic} where ${meaning("Interactivity", "participants explore freely")} — set in ${profile.place}, built around ${naturalJoin(pickSome(profile.artifacts, 2))}.`,
-    `${capitalize(profile.place)} becomes the classroom: an experience about ${topic} in which ${meaning("Interactivity", "participants set their own pace")}.`,
-    `A designed experience that turns ${topic} into a place — one where ${meaning("Embodiment", "participants feel genuinely present")} and ${naturalJoin(pickSome(profile.artifacts, 2))} are things you handle, not read about.`
+    `An immersive take on ${topic} where ${valueMeaning("Interactivity", "participants explore freely")} — set in ${profile.place}, built around ${naturalJoin(pickSome(profile.artifacts, 2))}.`,
+    `${capitalize(profile.place)} becomes the classroom: an experience about ${topic} in which ${valueMeaning("Interactivity", "participants set their own pace")}.`,
+    `A designed experience that turns ${topic} into a place — one where ${valueMeaning("Embodiment", "participants feel genuinely present")}, and ${naturalJoin(pickSome(profile.artifacts, 2))} are things you handle, not read about.`
   ]);
 
-  const audience = `${capitalize(meaning("Co-Participation", "designed for solo or small-group participation"))}. ${capitalize(meaning("Embodiment", "participants are present through their own natural perspective"))} — cast as ${pick([
+  const audience = `${capitalize(valueMeaning("Co-Participation", "designed for solo or small-group participation"))}. ${capitalize(valueMeaning("Embodiment", "participants are present through their own natural perspective"))} — cast as ${pick([
     "curious newcomers",
     "hands-on apprentices",
     "investigators with a real question",
     "co-creators with a stake in the outcome"
   ])} among ${profile.community}.`;
 
+  const storyCell = cellOf("Story");
   const flow =
-    `Arrival: participants step into ${profile.place}${v("Story") ? ` — ${interpret("Story", v("Story"))}` : ""}. ` +
-    `The core: they ${actionA}, then ${actionB}, while ${meaning("Dynamics", "the experience responds to whatever they try")}. ` +
+    `Arrival: participants step into ${profile.place}${storyCell ? ` — ${valueMeaning("Story", "")}` : ""}. ` +
+    `The core: they ${actionA}, then ${actionB}, while ${valueMeaning("Dynamics", "the experience responds to whatever they try")}. ` +
     `Resolution: the session closes with ${profile.payoff}.`;
 
-  const interaction = `${capitalize(meaning("Interactivity", "participants explore at their own pace"))}. In practice that means they ${actionA} — with ${meaning("Motivation", "curiosity as the only incentive")}.`;
+  const interaction = `${capitalize(valueMeaning("Interactivity", "participants explore at their own pace"))}. In practice that means they ${actionA} — with ${valueMeaning("Motivation", "curiosity as the only incentive")}. ${pick([
+    `This is the layer that decides ${columnMeaning("Interactivity")}.`,
+    `Everything else in the design builds on this choice.`,
+    ""
+  ])}`.trim();
 
-  const immersion = `${capitalize(meaning("Embodiment", "presence comes from attention to detail rather than hardware"))}. ${capitalize(meaning("Meta Control", "the world stays in the designer's hands, so every moment can be tuned"))} — which keeps the immersion feeling ${pick(["earned", "personal", "alive", "coherent"])}.`;
+  const immersion = `${capitalize(valueMeaning("Embodiment", "presence comes from attention to detail rather than hardware"))}. ${capitalize(valueMeaning("Meta Control", "the world stays in the designer's hands, so every moment can be tuned"))} — which keeps the immersion feeling ${pick(["earned", "personal", "alive", "coherent"])}.`;
 
-  const goal = `${capitalize(meaning("Learning", "learning happens through doing"))}. The target: ${profile.payoff}. Emotionally, participants should leave feeling ${pick([
+  const goal = `${capitalize(valueMeaning("Learning", "learning happens through doing"))}. The target: ${profile.payoff}. Emotionally, participants should leave feeling ${pick([
     "capable and curious for more",
     `personally connected to ${topic}`,
     "like insiders rather than audience members",
     "that they made something worth keeping"
   ])}.`;
 
-  const dataUse = `${capitalize(meaning("Data", "no tracking is required — the experience treats every participant the same and stays private by default"))}.`;
+  const dataUse = `${capitalize(valueMeaning("Data", "no tracking is required — the experience treats every participant the same and stays private by default"))}. ${pick([
+    `In this design, ${columnMeaning("Data")}.`,
+    "Whatever is collected should be visible, explained, and easy to decline.",
+    ""
+  ])}`.trim();
 
-  const techFit = `${capitalize(meaning("Tech", "no particular platform is required — the design works in a plain physical space"))}. ${pick([
+  const techFit = `${capitalize(valueMeaning("Tech", "no particular platform is required — the design works in a plain physical space"))}. ${pick([
     "The platform is a means, not the message: it should disappear behind the experience.",
     `The technology earns its place only where it makes ${topic} feel closer.`,
     "Delivery matches the design instead of driving it."
   ])}`;
 
-  const rationale = columnNames.map((col) => ({
-    col,
-    values: groups[col],
-    note: interpret(col, groups[col][0])
-  }));
+  /* Design rationale: category meaning + value meaning, per dimension */
+  const rationale = columnNames.map((col) => {
+    const cells = groups[col];
+    const first = cells[0];
+    const note = first.shortDescription
+      ? first.shortDescription.replace(/\.$/, "")
+      : `“${first.text}” shapes ${columnMeaning(col)}`;
+    return {
+      col,
+      colMeaning: capitalize(columnMeaning(col)),
+      values: cells.map((cell) => cell.text),
+      note
+    };
+  });
 
   const expansion = pick([
     `Add a second session where participants swap roles and experience ${topic} from a completely different perspective.`,
@@ -1426,12 +1809,46 @@ function composeIdea(topic, groups, profile) {
     `Swap one dimension (a different Tech or Story element, say) and run it again — comparing the two versions is a design lesson in itself.`
   ]);
 
-  return { title, pitch, audience, flow, interaction, immersion, goal, dataUse, techFit, rationale, expansion, groups, columnNames };
+  return { title, pitch, audience, flow, interaction, immersion, goal, dataUse, techFit, rationale, expansion };
 }
 
-/* Generates and renders an idea.
-   kind = "full"  → the complete design concept
-   kind = "spark" → a shorter, brainstorm-style version */
+/* Renders a stored/fresh idea object to HTML (viewer for both the
+   main output and the library detail — content itself stays data) */
+function renderIdeaBody(idea, kind) {
+  const section = (icon, label, bodyHTML) =>
+    `<h3><span class="section-icon" aria-hidden="true">${icon}</span>${label}</h3>${bodyHTML}`;
+
+  const rationaleHTML = `<ul>${(idea.rationale || [])
+    .map(
+      (r) =>
+        `<li><strong>${escapeHTML(r.col)}</strong> <span class="rationale-role">(${escapeHTML(r.colMeaning || "")})</span>: <em>${escapeHTML(naturalJoin(r.values))}</em> — ${escapeHTML(r.note)}.</li>`
+    )
+    .join("")}</ul>`;
+
+  if (kind === "spark") {
+    const sparks = (idea.rationale || []).slice(0, 3).map(
+      (r) => `${capitalize(r.note)} (${r.col}: ${naturalJoin(r.values)}).`
+    );
+    return `
+      ${section("⚡", "Pitch", `<p>${escapeHTML(idea.pitch)}</p>`)}
+      ${section("💭", "Sparks", `<ul>${sparks.map((s) => `<li>${escapeHTML(s)}</li>`).join("")}</ul>`)}
+      ${section("🚀", "If It Has Legs", `<p>${escapeHTML(idea.expansion)}</p>`)}
+    `;
+  }
+  return `
+    ${section("⚡", "Pitch", `<p>${escapeHTML(idea.pitch)}</p>`)}
+    ${section("👥", "Audience & Role", `<p>${escapeHTML(idea.audience)}</p>`)}
+    ${section("🗺️", "Experience Flow", `<p>${escapeHTML(idea.flow)}</p>`)}
+    ${section("🕹️", "Interaction Model", `<p>${escapeHTML(idea.interaction)}</p>`)}
+    ${section("🌊", "Immersion Strategy", `<p>${escapeHTML(idea.immersion)}</p>`)}
+    ${section("🎯", "Learning & Emotional Goal", `<p>${escapeHTML(idea.goal)}</p>`)}
+    ${section("📊", "Data & Personalization", `<p>${escapeHTML(idea.dataUse)}</p>`)}
+    ${section("🥽", "Technology Fit", `<p>${escapeHTML(idea.techFit)}</p>`)}
+    ${section("🧩", "Design Rationale", rationaleHTML)}
+    ${section("🚀", "Optional Expansion", `<p>${escapeHTML(idea.expansion)}</p>`)}
+  `;
+}
+
 function generateIdea(kind) {
   const topicRaw = $("topic-input").value.trim();
   const groups = buildGroups();
@@ -1448,70 +1865,49 @@ function generateIdea(kind) {
   const topic = topicRaw || "a topic of your choice";
   const profile = analyzeTopic(topic);
   const idea = composeIdea(topic, groups, profile);
-  lastGeneration = kind;
+  lastGeneration = { kind, topic, idea, selections: captureSelections() };
 
-  const chips = idea.columnNames
-    .map((col) => `<span class="chip">${escapeHTML(col)} · ${escapeHTML(idea.groups[col].join(", "))}</span>`)
+  const chips = Object.keys(groups)
+    .map((col) => `<span class="chip">${escapeHTML(col)} · ${escapeHTML(groups[col].map((cell) => cell.text).join(", "))}</span>`)
     .join("");
-
-  const section = (icon, label, bodyHTML) =>
-    `<h3><span class="section-icon" aria-hidden="true">${icon}</span>${label}</h3>${bodyHTML}`;
-
-  const rationaleHTML = `<ul>${idea.rationale
-    .map(
-      (r) =>
-        `<li><strong>${escapeHTML(r.col)}:</strong> <em>${escapeHTML(naturalJoin(r.values))}</em> — ${escapeHTML(r.note)}.</li>`
-    )
-    .join("")}</ul>`;
-
-  let body;
-  if (kind === "spark") {
-    const sparks = [
-      `Open with this: participants ${pick(profile.actions)}.`,
-      ...pickSome(idea.rationale, Math.min(2, idea.rationale.length)).map(
-        (r) => `${capitalize(r.note)} (${r.col}: ${naturalJoin(r.values)}).`
-      )
-    ];
-    body = `
-      ${section("⚡", "Pitch", `<p>${escapeHTML(idea.pitch)}</p>`)}
-      ${section("💭", "Sparks", `<ul>${sparks.map((s) => `<li>${escapeHTML(s)}</li>`).join("")}</ul>`)}
-      ${section("🚀", "If It Has Legs", `<p>${escapeHTML(idea.expansion)}</p>`)}
-    `;
-  } else {
-    body = `
-      ${section("⚡", "Pitch", `<p>${escapeHTML(idea.pitch)}</p>`)}
-      ${section("👥", "Audience & Role", `<p>${escapeHTML(idea.audience)}</p>`)}
-      ${section("🗺️", "Experience Flow", `<p>${escapeHTML(idea.flow)}</p>`)}
-      ${section("🕹️", "Interaction Model", `<p>${escapeHTML(idea.interaction)}</p>`)}
-      ${section("🌊", "Immersion Strategy", `<p>${escapeHTML(idea.immersion)}</p>`)}
-      ${section("🎯", "Learning & Emotional Goal", `<p>${escapeHTML(idea.goal)}</p>`)}
-      ${section("📊", "Data & Personalization", `<p>${escapeHTML(idea.dataUse)}</p>`)}
-      ${section("🥽", "Technology Fit", `<p>${escapeHTML(idea.techFit)}</p>`)}
-      ${section("🧩", "Design Rationale", rationaleHTML)}
-      ${section("🚀", "Optional Expansion", `<p>${escapeHTML(idea.expansion)}</p>`)}
-    `;
-  }
 
   const output = $("idea-output");
   output.innerHTML = `
     <div class="recipe-chips">${chips}</div>
     <h2>${escapeHTML(idea.title)}</h2>
-    ${body}
+    ${renderIdeaBody(idea, kind)}
+    <div class="idea-actions" id="idea-actions"></div>
   `;
+  refreshSaveButton();
   output.hidden = false;
   output.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
+/* The Save button under a generated idea (signed-in users only) */
+function refreshSaveButton() {
+  const holder = $("idea-actions");
+  if (!holder) return;
+  holder.innerHTML = "";
+  if (!cloud.configured || !lastGeneration) return;
+  const btn = document.createElement("button");
+  btn.id = "save-experience-btn";
+  btn.className = "btn btn-primary";
+  btn.type = "button";
+  btn.textContent = cloud.user ? "💾 Save Experience" : "💾 Sign in to save this experience";
+  btn.addEventListener("click", saveCurrentExperience);
+  holder.append(btn);
+}
+
 function regenerate() {
-  generateIdea(lastGeneration || "full");
+  generateIdea(lastGeneration?.kind || "full");
 }
 
 /* ------------------------------------------------------------
-   15. MODE SWITCHING + WIRING EVERYTHING UP
+   18. MODE SWITCHING + WIRING EVERYTHING UP
    ------------------------------------------------------------ */
 const MODE_HINTS = {
-  edit: "Click any cell to edit its text. ✎ beside a column name edits its description. Changes save automatically.",
-  idea: "Click cells to choose design elements — lock favorites, randomize the rest, then generate. Click a column heading for its meaning.",
+  edit: "Click any cell to edit its text; ✎ edits its description. ✎ beside a column name edits the category. Changes save automatically.",
+  idea: "Click cells to choose design elements — ⓘ shows what a value means without selecting it. Lock favorites, randomize the rest, then generate.",
   inspire: "A complete experience recipe — one element per dimension. Lock favorites, reroll the rest, then generate."
 };
 
@@ -1567,11 +1963,11 @@ function init() {
   $("idea-mode-btn").addEventListener("click", () => setMode("idea"));
   $("inspire-mode-btn").addEventListener("click", () => setMode("inspire"));
 
-  // Edit Mode buttons
+  // Edit Mode
   $("add-row-btn").addEventListener("click", addRow);
   $("add-col-btn").addEventListener("click", addColumn);
   $("save-now-btn").addEventListener("click", () => {
-    if (cloud.configured && cloud.user) saveToCloud();
+    if (cloud.configured && cloud.user && isAdminUid(cloud.user.uid)) saveToCloud();
     else markChanged();
   });
   $("retry-save-btn").addEventListener("click", saveToCloud);
@@ -1584,7 +1980,7 @@ function init() {
   });
   $("reset-btn").addEventListener("click", resetToDefault);
 
-  // Design Ideas Mode buttons
+  // Design Ideas Mode
   $("gen-full-btn").addEventListener("click", () => generateIdea("full"));
   $("gen-spark-btn").addEventListener("click", () => generateIdea("spark"));
   $("regen-btn").addEventListener("click", regenerate);
@@ -1593,51 +1989,97 @@ function init() {
   $("lock-selection-btn").addEventListener("click", toggleSelectionLock);
   $("clear-btn").addEventListener("click", clearSelection);
 
-  // Inspiration Mode buttons
+  // Inspiration Mode
   $("inspire-full-btn").addEventListener("click", () => generateIdea("full"));
   $("inspire-spark-btn").addEventListener("click", () => generateIdea("spark"));
   $("inspire-regen-btn").addEventListener("click", regenerate);
   $("new-recipe-btn").addEventListener("click", newRecipe);
 
-  // Topic box: Enter generates a full experience
   $("topic-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") generateIdea("full");
   });
 
-  // Description modal (read-only)
+  // Description viewer + editor
   $("desc-modal-close").addEventListener("click", () => $("desc-modal").close());
-
-  // Description editor: Save / Cancel, guard Escape against data loss
-  $("desc-editor-save").addEventListener("click", saveDescriptionEditor);
-  $("desc-editor-cancel").addEventListener("click", cancelDescriptionEditor);
-  $("desc-editor-close").addEventListener("click", cancelDescriptionEditor);
+  $("desc-editor-save").addEventListener("click", saveEditor);
+  $("desc-editor-cancel").addEventListener("click", cancelEditor);
+  $("desc-editor-close").addEventListener("click", cancelEditor);
   $("desc-editor").addEventListener("cancel", (e) => {
-    if (editorIsDirty() && !confirm("Discard your changes to this category?")) e.preventDefault();
-    else editingColIndex = null;
+    if (editorIsDirty() && !confirm("Discard your changes?")) e.preventDefault();
+    else editingTarget = null;
   });
 
-  // Admin sign-in
-  $("admin-btn").addEventListener("click", handleAdminButton);
-  $("login-submit").addEventListener("click", submitLogin);
-  $("login-cancel").addEventListener("click", () => $("login-modal").close());
-  $("login-close").addEventListener("click", () => $("login-modal").close());
-  $("login-password").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submitLogin();
+  // Search
+  $("search-input").addEventListener("input", renderSearchResults);
+  $("search-input").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { $("search-results").hidden = true; }
+    if (e.key === "Enter") {
+      const first = $("search-results").querySelector(".search-result");
+      if (first) first.click();
+    }
   });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-bar")) $("search-results").hidden = true;
+    if (!e.target.closest(".account-menu-wrap")) closeAccountDropdown();
+  });
+
+  // Authentication
+  $("signin-btn").addEventListener("click", () => openAuthModal("signin"));
+  $("signup-btn").addEventListener("click", () => openAuthModal("signup"));
+  $("auth-submit").addEventListener("click", submitAuth);
+  $("auth-cancel").addEventListener("click", () => $("auth-modal").close());
+  $("auth-close").addEventListener("click", () => $("auth-modal").close());
+  $("auth-to-signup").addEventListener("click", () => setAuthMode("signup"));
+  $("auth-to-signin").addEventListener("click", () => setAuthMode("signin"));
+  $("auth-to-reset").addEventListener("click", () => setAuthMode("reset"));
+  ["auth-password", "auth-confirm"].forEach((id) =>
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") submitAuth(); })
+  );
+
+  // Account dropdown
+  $("account-btn").addEventListener("click", toggleAccountDropdown);
+  $("menu-signout-btn").addEventListener("click", signOutUser);
+  $("menu-library-btn").addEventListener("click", openLibrary);
+
+  // Experience library
+  $("library-close").addEventListener("click", () => $("library-modal").close());
+  $("lib-back").addEventListener("click", () => {
+    $("library-detail-view").hidden = true;
+    $("library-list-view").hidden = false;
+    renderLibraryList();
+  });
+  $("lib-search").addEventListener("input", renderLibraryList);
+  $("lib-sort").addEventListener("change", renderLibraryList);
+  $("lib-fav-only").addEventListener("change", renderLibraryList);
+  $("lib-save-changes").addEventListener("click", saveLibraryChanges);
+  $("lib-fav").addEventListener("click", toggleLibraryFavorite);
+  $("lib-duplicate").addEventListener("click", duplicateLibraryItem);
+  $("lib-delete").addEventListener("click", deleteLibraryItem);
+  $("lib-load").addEventListener("click", libraryLoad);
+  $("lib-regen").addEventListener("click", libraryRegenerate);
 
   applyAccessControl();
-  setMode("idea");   // public visitors land in Design Ideas mode
+  setMode("idea");
   if (!cloud.configured) {
     setSyncStatus("local", "Local mode — edits save in this browser only.");
   }
-  initCloud();       // async: may adopt the cloud version and re-render
+  initCloud();
 }
 
 init();
 
-/* Debug/testing handle (harmless to leave in production):
-   lets the browser console inspect state, e.g. TaxonomyApp.state().mode */
+/* Debug/testing handle: lets the browser console inspect state,
+   e.g. TaxonomyApp.state().mode */
 window.TaxonomyApp = {
-  state: () => ({ mode, cloud: { ...cloud, db: undefined, auth: undefined, fns: undefined }, columns: taxonomy.columns.map((c) => c.name), rows: taxonomy.rows.length, selected: selectedCells.size, locked: lockedSelection.size }),
-  canEdit
+  state: () => ({
+    mode,
+    cloud: { configured: cloud.configured, ready: cloud.ready, dirty: cloud.dirty, revision: cloud.revision, user: cloud.user ? { uid: cloud.user.uid, email: cloud.user.email, admin: isAdminUid(cloud.user.uid) } : null },
+    schemaVersion: taxonomy.schemaVersion,
+    columns: taxonomy.columns.map((c) => c.name),
+    rows: taxonomy.rows.length,
+    selected: selectedCells.size,
+    locked: lockedSelection.size
+  }),
+  canEdit,
+  isAdminUid
 };

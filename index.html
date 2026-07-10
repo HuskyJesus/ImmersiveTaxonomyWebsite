@@ -10,7 +10,7 @@
 <body>
 
   <!-- ============================================================
-       SITE HEADER — dark green brand bar with the mode switcher
+       SITE HEADER — brand, mode switcher, and account controls
        ============================================================ -->
   <header class="site-header">
     <div class="header-inner">
@@ -19,27 +19,45 @@
         <span class="brand-name">Immersive Taxonomy</span>
       </div>
 
-      <!-- Mode switcher: exactly one mode is active at a time.
-           The Edit tab is hidden for public visitors when cloud
-           sync is configured (script.js controls this). -->
+      <!-- Mode switcher: the Edit tab only appears for admins -->
       <nav class="mode-toggle" aria-label="Mode">
         <button id="idea-mode-btn" class="mode-btn is-active" type="button">💡 Design Ideas</button>
         <button id="inspire-mode-btn" class="mode-btn" type="button">✨ Inspiration</button>
         <button id="edit-mode-btn" class="mode-btn" type="button">✏️ Edit</button>
       </nav>
+
+      <!-- Account controls (upper right). Hidden entirely until
+           Firebase is configured. script.js swaps the two states. -->
+      <div id="account-area" class="account-area" hidden>
+        <div id="auth-buttons">
+          <button id="signin-btn" class="account-btn" type="button">Sign In</button>
+          <button id="signup-btn" class="account-btn account-btn-solid" type="button">Sign Up</button>
+        </div>
+        <div id="account-menu-wrap" class="account-menu-wrap" hidden>
+          <button id="account-btn" class="account-btn" type="button" aria-haspopup="true" aria-expanded="false">
+            <span aria-hidden="true">👤</span>
+            <span id="account-name" class="account-name"></span>
+            <span aria-hidden="true">▾</span>
+          </button>
+          <div id="account-dropdown" class="account-dropdown" hidden>
+            <button id="menu-library-btn" type="button">📚 Saved Experiences</button>
+            <button id="menu-signout-btn" type="button">Sign Out</button>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
   <!-- ============================================================
-       HERO — explains what the taxonomy is
+       HERO
        ============================================================ -->
   <section class="hero">
     <p class="hero-eyebrow">A design framework, not a spreadsheet</p>
     <h1>Design immersive experiences, <span class="gradient-text">one dimension at a time</span></h1>
     <p class="hero-sub">
       Every column below is a design dimension of an immersive experience — from how participants
-      interact, to how the story unfolds, to the technology that delivers it. Click a column
-      heading to learn what it means, combine its elements, or let a random recipe spark your next idea.
+      interact, to how the story unfolds, to the technology that delivers it. Click any heading or
+      the ⓘ beside a value to learn what it means, then combine elements into your next idea.
     </p>
   </section>
 
@@ -54,7 +72,6 @@
           <button id="add-row-btn" class="btn" type="button">+ Add Row</button>
           <button id="add-col-btn" class="btn" type="button">+ Add Column</button>
         </div>
-        <!-- Cloud save status: Saving… / All changes saved / Save failed -->
         <div class="cloud-bar">
           <button id="save-now-btn" class="btn btn-brand" type="button">Save Now</button>
           <button id="retry-save-btn" class="btn btn-danger" type="button" hidden>Retry Save</button>
@@ -63,8 +80,6 @@
         </div>
       </div>
 
-      <!-- JSON import/export lives here now — out of the everyday
-           workflow, still available as an emergency backup. -->
       <details class="backup-tools">
         <summary>Backup Tools (advanced)</summary>
         <div class="toolbar-group">
@@ -86,14 +101,12 @@
          ============================================================ -->
     <section id="idea-tools" class="panel panel-stack" aria-label="Design ideas tools" hidden>
       <div id="idea-topic-slot"></div>
-      <!-- Generation actions -->
       <div class="toolbar-group">
         <button id="gen-full-btn" class="btn btn-primary" type="button">✨ Generate Full Experience</button>
         <button id="gen-spark-btn" class="btn" type="button">💡 Generate Inspiration</button>
         <button id="regen-btn" class="btn" type="button">🔁 Regenerate</button>
         <button id="random-path-btn" class="btn btn-brand" type="button">🎲 Generate From Random Path</button>
       </div>
-      <!-- Selection actions -->
       <div class="toolbar-group">
         <button id="randomize-btn" class="btn" type="button">Randomize Selection</button>
         <button id="lock-selection-btn" class="btn" type="button">🔒 Lock Selection</button>
@@ -129,6 +142,20 @@
       />
     </div>
 
+    <!-- ============================================================
+         TAXONOMY SEARCH — categories, values, descriptions, examples
+         ============================================================ -->
+    <div class="search-bar">
+      <input
+        id="search-input"
+        type="search"
+        placeholder="🔍 Search the taxonomy — categories, values, descriptions, examples…"
+        autocomplete="off"
+        aria-label="Search the taxonomy"
+      />
+      <div id="search-results" class="search-results" hidden role="listbox"></div>
+    </div>
+
     <!-- Short hint that changes with the mode -->
     <p id="mode-hint" class="mode-hint"></p>
 
@@ -146,27 +173,24 @@
   </main>
 
   <!-- ============================================================
-       FOOTER — version info + understated admin entry point
+       FOOTER — version info (sign-in now lives in the header)
        ============================================================ -->
   <footer class="site-footer">
-    <p>Immersive Experience Design Taxonomy · v2.0</p>
-    <p id="footer-note">Runs in your browser — no account needed to explore and generate ideas.</p>
-    <p>
-      <button id="admin-btn" class="admin-link" type="button">Admin sign in</button>
-      <span id="admin-status" class="admin-status"></span>
-    </p>
+    <p>Immersive Experience Design Taxonomy · v3.0</p>
+    <p>Runs in your browser — no account needed to explore and generate ideas. Create one to save your experiences.</p>
   </footer>
 
   <!-- ============================================================
        DIALOGS
-       <dialog> gives us Escape-to-close and focus containment
-       for free; script.js opens them with showModal().
        ============================================================ -->
 
-  <!-- Read-only category description (Idea/Inspiration modes) -->
+  <!-- Read-only description viewer (categories AND values) -->
   <dialog id="desc-modal" class="modal" aria-labelledby="desc-modal-title">
     <div class="modal-head">
-      <h2 id="desc-modal-title"></h2>
+      <div>
+        <p id="desc-modal-context" class="modal-context" hidden></p>
+        <h2 id="desc-modal-title"></h2>
+      </div>
       <button id="desc-modal-close" class="modal-close" type="button" aria-label="Close">✕</button>
     </div>
     <p id="desc-modal-short" class="modal-lead"></p>
@@ -180,14 +204,14 @@
     </div>
   </dialog>
 
-  <!-- Category editor (Edit mode) -->
+  <!-- Description editor (Edit mode — categories AND values) -->
   <dialog id="desc-editor" class="modal" aria-labelledby="desc-editor-title">
     <div class="modal-head">
-      <h2 id="desc-editor-title">Edit Category</h2>
+      <h2 id="desc-editor-title">Edit</h2>
       <button id="desc-editor-close" class="modal-close" type="button" aria-label="Close">✕</button>
     </div>
     <label class="field">
-      <span>Category name</span>
+      <span id="edit-cat-name-label">Name</span>
       <input id="edit-cat-name" type="text" />
     </label>
     <label class="field">
@@ -208,24 +232,85 @@
     </div>
   </dialog>
 
-  <!-- Administrator sign-in -->
-  <dialog id="login-modal" class="modal" aria-labelledby="login-title">
+  <!-- Authentication: sign in / sign up / password reset -->
+  <dialog id="auth-modal" class="modal" aria-labelledby="auth-title">
     <div class="modal-head">
-      <h2 id="login-title">Administrator Sign In</h2>
-      <button id="login-close" class="modal-close" type="button" aria-label="Close">✕</button>
+      <h2 id="auth-title">Sign In</h2>
+      <button id="auth-close" class="modal-close" type="button" aria-label="Close">✕</button>
     </div>
+    <label class="field" id="auth-name-field" hidden>
+      <span>Display name</span>
+      <input id="auth-name" type="text" autocomplete="name" />
+    </label>
     <label class="field">
       <span>Email</span>
-      <input id="login-email" type="email" autocomplete="username" />
+      <input id="auth-email" type="email" autocomplete="username" />
     </label>
-    <label class="field">
+    <label class="field" id="auth-password-field">
       <span>Password</span>
-      <input id="login-password" type="password" autocomplete="current-password" />
+      <input id="auth-password" type="password" autocomplete="current-password" />
     </label>
-    <p id="login-error" class="login-error" hidden></p>
+    <label class="field" id="auth-confirm-field" hidden>
+      <span>Confirm password</span>
+      <input id="auth-confirm" type="password" autocomplete="new-password" />
+    </label>
+    <p id="auth-error" class="login-error" hidden></p>
+    <p id="auth-info" class="auth-info" hidden></p>
     <div class="modal-actions">
-      <button id="login-submit" class="btn btn-primary" type="button">Sign In</button>
-      <button id="login-cancel" class="btn" type="button">Cancel</button>
+      <button id="auth-submit" class="btn btn-primary" type="button">Sign In</button>
+      <button id="auth-cancel" class="btn" type="button">Cancel</button>
+    </div>
+    <p class="auth-links">
+      <button id="auth-to-signup" class="link-btn" type="button">Create an account</button>
+      <button id="auth-to-signin" class="link-btn" type="button" hidden>Have an account? Sign in</button>
+      <button id="auth-to-reset" class="link-btn" type="button">Forgot password?</button>
+    </p>
+  </dialog>
+
+  <!-- Saved Experiences library -->
+  <dialog id="library-modal" class="modal modal-wide" aria-labelledby="library-title">
+    <div class="modal-head">
+      <h2 id="library-title">📚 Saved Experiences</h2>
+      <button id="library-close" class="modal-close" type="button" aria-label="Close">✕</button>
+    </div>
+
+    <!-- List view -->
+    <div id="library-list-view">
+      <div class="library-controls">
+        <input id="lib-search" type="search" placeholder="Search title, topic, notes…" aria-label="Search saved experiences" />
+        <select id="lib-sort" aria-label="Sort saved experiences">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="title">Title A–Z</option>
+          <option value="favorite">Favorites first</option>
+        </select>
+        <label class="lib-filter"><input id="lib-fav-only" type="checkbox" /> ★ Favorites only</label>
+      </div>
+      <div id="lib-list" class="lib-list"></div>
+      <p id="lib-empty" class="panel-note" hidden>Nothing saved yet — generate an experience and press “Save Experience”.</p>
+    </div>
+
+    <!-- Detail view -->
+    <div id="library-detail-view" hidden>
+      <button id="lib-back" class="btn" type="button">← Back to list</button>
+      <div class="lib-detail-head">
+        <input id="lib-title" class="lib-title-input" type="text" aria-label="Experience title" />
+        <button id="lib-fav" class="icon-btn lib-fav-btn" type="button" title="Toggle favorite">☆</button>
+      </div>
+      <p id="lib-meta" class="panel-note"></p>
+      <div id="lib-chips" class="recipe-chips"></div>
+      <label class="field">
+        <span>Notes</span>
+        <textarea id="lib-notes" rows="3" placeholder="Your notes about this experience…"></textarea>
+      </label>
+      <div class="toolbar-group lib-actions">
+        <button id="lib-save-changes" class="btn btn-primary" type="button">Save Changes</button>
+        <button id="lib-load" class="btn btn-brand" type="button">Load Into Generator</button>
+        <button id="lib-regen" class="btn" type="button">🔁 Regenerate &amp; View</button>
+        <button id="lib-duplicate" class="btn" type="button">Duplicate</button>
+        <button id="lib-delete" class="btn btn-danger" type="button">Delete</button>
+      </div>
+      <div id="lib-content" class="lib-content"></div>
     </div>
   </dialog>
 

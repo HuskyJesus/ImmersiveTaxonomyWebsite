@@ -1,135 +1,107 @@
 # Immersive Experience Design Taxonomy
 
-An interactive design framework for immersive experience design — a static site built with plain HTML, CSS, and JavaScript, hosted on GitHub Pages, with optional cloud saving through Firebase.
+An interactive design framework for immersive experience design — a static site built with plain HTML, CSS, and JavaScript, hosted on GitHub Pages, with Firebase for accounts, cloud saving, and per-user experience libraries.
 
 **Live site:** https://huskyjesus.github.io/ImmersiveTaxonomyWebsite/
 
-Each **column** of the taxonomy is a *design dimension* (Interactivity, Embodiment, Story, Tech, …) and each cell is one possibility within it. Click any column heading (the ⓘ) to read what that dimension means.
+Each **column** of the taxonomy is a *design dimension* (Interactivity, Embodiment, Story, Tech, …) and each cell is one **value** within it. Both columns and values have descriptions — click a column heading or the ⓘ beside any value to read them, or use the search bar to find anything by name, description, or example.
+
+## Access levels
+
+| | Public visitor | Signed-in user | Administrator |
+|---|---|---|---|
+| Explore, read descriptions, search | ✓ | ✓ | ✓ |
+| Select cells, randomize, generate | ✓ | ✓ | ✓ |
+| Save experiences to a personal library | | ✓ | ✓ |
+| Edit the taxonomy + descriptions | | | ✓ |
+
+Administrators are fixed by a UID allowlist in [`firestore.rules`](firestore.rules) — creating an account never grants edit access, and nothing a user can write is consulted for authorization, so self-promotion is impossible.
 
 ## Using the site
 
-### 💡 Design Ideas mode (everyone)
+### Accounts (header, upper right)
 
-- **Click cells** to choose design elements; **click column headings** for their descriptions.
-- **Randomize Selection** builds a complete design recipe — exactly one cell from every column.
-- **🔒 Lock Selection** protects your picks (shown in green); Randomize fills only the unlocked dimensions.
-- **✨ Generate Full Experience / 💡 Generate Inspiration / 🔁 Regenerate** turn a topic plus your selections into an experience concept. The generator is rule-based and runs entirely in the browser.
+- **Sign Up** — display name, email, password (+ confirmation). Registration signs you in automatically and creates your profile.
+- **Sign In / Forgot password?** — standard email/password sign-in with password-reset emails.
+- Signed in, your name appears in the header with a menu: **📚 Saved Experiences** and **Sign Out**.
 
-### ✨ Inspiration mode (everyone)
+### 💡 Design Ideas / ✨ Inspiration (everyone)
 
-Rolls a complete experience recipe — one value per dimension, shown as cards. 🔄 rerolls one card, 🔓/🔒 locks it, 🎲 New Recipe rerolls the rest. Enter a topic and generate.
+- **Click cells** to choose design elements; the **ⓘ** beside a value opens its meaning *without* selecting it.
+- **Randomize Selection** builds a complete recipe — exactly one value per dimension. **🔒 Lock Selection** protects picks.
+- **Generate Full Experience / Generate Inspiration / Regenerate** turn a topic plus selections into a concept. The generator reads the *descriptions* of the chosen values and their categories — the same editable text in the info dialogs — so ideas are interpreted, not concatenated. It runs entirely in the browser.
+- **💾 Save Experience** (under a generated idea, signed-in users) stores it in your library.
 
-### ✏️ Edit mode (administrators)
+### 📚 Saved Experiences
 
-Visible after signing in via the **Admin sign in** link in the footer (or always, in local mode — see below):
+Search, sort (newest/oldest/title/favorites), and filter your saved experiences. Opening one shows the full concept, its taxonomy selections, notes, and dates. You can rename it, edit notes, favorite it, duplicate it, delete it, **load its selections back into the generator**, or **regenerate a fresh variation from the same recipe** (saving that creates a separate entry).
 
-- Edit any cell or column name in place; **✎** beside a column name opens the full category editor (name, short description, detailed description, example) with Save/Cancel.
-- Add or delete rows and columns. Deleting a column asks for confirmation because its description goes with it. Every column has a stable internal ID, so renaming never loses a description.
-- **Changes save automatically** about a second after you stop typing. The status line shows *Saving… / All changes saved / Save failed / Offline changes pending*, plus a *Last saved* time. **Save Now** forces a save; **Retry Save** appears if one fails.
-- **Backup Tools (advanced)** holds JSON export/import (with validation and a confirmation preview), **Restore Last Cloud Version**, and Reset to Default. None of this is needed for everyday editing.
+### ✏️ Edit Mode (administrators)
 
-The starter category descriptions are **editable placeholder content**, not final academic definitions — edit them freely in the site (or in `DEFAULT_COLUMNS` in `script.js`).
+- Edit any cell's text inline; the **✎** inside a cell edits that value's descriptions; **✎** beside a column name edits the category. Save/Cancel with a discard warning.
+- Columns **and values** have stable internal IDs — renaming never loses descriptions or breaks saved experiences.
+- Add/delete rows and columns (deletions confirm first, since descriptions go with them). New columns and rows get blank description records automatically.
+- Changes autosave to the cloud (~1.2 s debounce) with visible status, Save Now, Retry, and Last-saved time. **Backup Tools** holds JSON export/import (validated, confirmed) and Restore Last Cloud Version.
 
-## The two operating modes
+All starter descriptions — for the 10 categories and all 50 values — are **editable placeholder content** in [`starter-content.js`](starter-content.js), not final academic definitions.
 
-1. **Local mode (out of the box).** Until Firebase is configured, everything works exactly like a local app: anyone can open Edit mode, and changes save to that browser's localStorage only. Good for trying the site out.
-2. **Cloud mode (after Firebase setup).** The taxonomy is published in Cloud Firestore. Every visitor sees the same published version. Edit mode is hidden until an administrator signs in; admin edits autosave to the cloud. localStorage remains as an offline cache and crash-safety net — if the connection drops, edits are kept locally and flagged as *pending* until an admin saves them.
-
-Load priority: Firestore → local cache → built-in default. If a browser holds unsaved local edits when a (newer) cloud version exists, the site asks whether to keep or discard them — it never silently overwrites either side.
-
-## Firebase setup (one-time, ~15 minutes)
-
-Cloud saving needs a free Firebase project. **No code changes are required beyond pasting six values into one file.**
-
-### 1. Create the Firebase project
-
-1. Go to https://console.firebase.google.com and sign in with a Google account.
-2. Click **Add project**, name it (e.g. `immersive-taxonomy`), and create it. Google Analytics can be off.
-
-### 2. Enable Cloud Firestore
-
-1. In the left sidebar: **Build → Firestore Database → Create database**.
-2. Choose a location near you, and start in **production mode** (we'll paste real rules next).
-
-### 3. Paste the security rules
-
-1. In Firestore, open the **Rules** tab.
-2. Replace everything with the contents of [`firestore.rules`](firestore.rules) from this repository.
-3. Leave `PASTE_ADMIN_UID_HERE` for now — you'll fill it in at step 5. Click **Publish**.
-
-### 4. Enable email/password sign-in and create the admin account(s)
-
-1. **Build → Authentication → Get started**.
-2. Under **Sign-in method**, enable **Email/Password** (just the first toggle).
-3. Under the **Users** tab, click **Add user** for each administrator (email plus a strong password). Any number of administrator accounts is supported.
-
-### 5. Put the admin UID(s) into the rules
-
-1. Still in **Authentication → Users**, copy the value in the **User UID** column for each administrator account.
-2. In **Firestore Database → Rules**, the `isAdmin()` function near the top of [`firestore.rules`](firestore.rules) holds the allowlist — one obvious place to manage edit access. Add one quoted UID per line, comma-separated:
-
-   ```
-   function isAdmin() {
-     return request.auth != null && request.auth.uid in [
-       "uid-of-first-admin",    // Father
-       "uid-of-second-admin"    // Site maintainer
-     ];
-   }
-   ```
-
-3. Click **Publish**. To add or remove an administrator later, edit this list and publish again — no website changes needed.
-
-Creating a Firebase account does **not** grant edit access — only UIDs in this list can write. (An account that signs in without being on the list can open Edit mode in their browser, but every save is rejected by Firestore with a clear "not on the admin allowlist" message.)
-
-### 6. Add the web configuration to the site
-
-1. **Project settings** (gear icon) → **General** → under *Your apps* click the web icon (`</>`), register an app (any nickname, no hosting needed).
-2. Firebase shows a `firebaseConfig` object. Copy its six values into [`firebase-config.js`](firebase-config.js) in this repository, replacing each `PASTE_...` string.
-3. These values are safe to publish — security comes from Authentication + the rules, not from hiding the config.
-
-### 7. Deploy the updated site
-
-Commit and push `firebase-config.js` (and any other changes) to the `main` branch — GitHub Pages redeploys automatically in about a minute. (Uploading the edited file through the GitHub website works too: open the file → pencil icon → paste → Commit.)
-
-### 8. Test both access levels
-
-- **Public:** open the site in a private/incognito window. You should see Design Ideas and Inspiration but **no Edit tab**. Everything read-only works.
-- **Admin:** click **Admin sign in** in the footer, sign in with the account from step 4, and the Edit tab appears. Make a small edit — the status should show *Saving…* then *All changes saved* with a timestamp. Your first save creates the published `taxonomy/current` document; refresh the incognito window to confirm the public site shows the change.
-
-## Data model
-
-Firestore holds one document, `taxonomy/current`:
+## Firestore schema
 
 ```
+taxonomy/current                        ← the published taxonomy (public read, admin write)
 {
-  schemaVersion: 2,
-  columns: [
-    {
-      id: "interactivity",          // stable — survives renames
-      name: "Interactivity",
-      shortDescription: "...",
-      detailedDescription: "...",
-      example: "...",
-      values: ["Passive", "Interactive", ...]   // this column's cells, top to bottom
-    },
-    ...
-  ],
-  rowCount: 5,
-  updatedAt: <server timestamp>,
-  updatedBy: <admin uid>
+  schemaVersion: 3,
+  columns: [{
+    id, name,                           ← id is stable across renames
+    shortDescription, detailedDescription, example,
+    values: [{                          ← this column's cells, top to bottom
+      id, text,                         ← id is stable across renames
+      shortDescription, detailedDescription, example
+    }]
+  }],
+  rowCount, updatedAt, updatedBy
+}
+
+users/{uid}                             ← owner-only
+{ displayName, email, createdAt, lastLoginAt }   ← never passwords, never roles
+
+users/{uid}/savedExperiences/{id}       ← owner-only
+{
+  schemaVersion: 1,
+  title, topic, kind ("full"|"spark"), notes, favorite,
+  selections: [{ columnId, columnName, valueId, valueText }],
+  content: { pitch, audience, flow, interaction, immersion,
+             goal, dataUse, techFit, rationale[], expansion },   ← structured text, no HTML
+  createdAt, updatedAt
 }
 ```
 
-(Cell values are stored per-column because Firestore doesn't allow arrays nested directly inside arrays.) The same structure, minus timestamps, is what JSON export produces and import accepts — old exports from the previous version are migrated automatically.
+Older data migrates automatically on load: v1/v2 localStorage, v2 cloud documents, and old JSON exports are upgraded to schema 3 — existing IDs are kept, known default values receive starter descriptions, and custom text is never overwritten.
+
+## Security rules summary
+
+[`firestore.rules`](firestore.rules):
+
+- `isAdmin()` — the single admin UID allowlist (currently Father + site maintainer). Edit the list, publish, done.
+- `taxonomy/*` — public read; write only via `isAdmin()`.
+- `users/{uid}` and `users/{uid}/savedExperiences/*` — full access only for that user (`request.auth.uid == uid`).
+- Everything else — denied.
+
+## Firebase setup
+
+Already done for this project (config in [`firebase-config.js`](firebase-config.js)). For a fresh deployment: create a Firebase project, enable **Firestore** and **Email/Password authentication**, paste [`firestore.rules`](firestore.rules) into Firestore → Rules (updating the admin UIDs), and paste the web-app config values into `firebase-config.js`. Push to `main` — GitHub Pages redeploys automatically.
+
+**After every change to `firestore.rules` in this repository, the rules must be re-published in the Firebase Console** (Firestore Database → Rules) — GitHub Pages only serves the website, not the rules.
 
 ## Project structure
 
 | File | Purpose |
 |---|---|
-| `index.html` | Page structure, dialogs (description viewer/editor, admin sign-in) |
+| `index.html` | Page structure + dialogs (info viewer, editor, auth, library) |
 | `styles.css` | All styling — theme variables at the top |
-| `script.js` | All logic — data model, rendering, generator, cloud sync |
-| `firebase-config.js` | **The only file to edit for cloud setup** — paste your Firebase web config |
-| `firestore.rules` | Firestore security rules (public read, admin-allowlist write) |
+| `script.js` | All logic — data model, cloud sync, auth, library, generator |
+| `starter-content.js` | Default taxonomy + all editable starter descriptions |
+| `firebase-config.js` | Firebase web config |
+| `firestore.rules` | Security rules (publish these in the Firebase Console) |
 
-Version 2.0
+Version 3.0
