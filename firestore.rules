@@ -1,0 +1,40 @@
+// ============================================================
+// Firestore Security Rules — Immersive Experience Taxonomy
+// ============================================================
+//
+// Paste these rules in: Firebase Console → Firestore Database
+// → Rules → (replace everything) → Publish.
+//
+// IMPORTANT: replace "PASTE_ADMIN_UID_HERE" below with the real
+// UID of the administrator account. You can find it in:
+// Firebase Console → Authentication → Users → "User UID" column.
+//
+// To allow more than one administrator, add UIDs to the list:
+//   ["uid-one", "uid-two"]
+//
+// What these rules enforce:
+//   - Anyone (signed in or not) can READ the published taxonomy,
+//     so the public website works for every visitor.
+//   - Only the listed admin UID(s) can WRITE the taxonomy.
+//     Creating a Firebase account does NOT grant edit access —
+//     the UID must be in this allowlist.
+//   - Every other document in the database is fully locked down.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The published taxonomy (one document: taxonomy/current)
+    match /taxonomy/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid in ["PASTE_ADMIN_UID_HERE"];
+    }
+
+    // Everything else: no access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

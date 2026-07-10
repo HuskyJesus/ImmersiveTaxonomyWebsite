@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Immersive Experience Design Taxonomy</title>
-  <meta name="description" content="An interactive framework for designing immersive experiences — edit the taxonomy, select design dimensions, and generate experience concepts." />
+  <meta name="description" content="An interactive framework for designing immersive experiences — explore the taxonomy, read its design dimensions, and generate experience concepts." />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -19,11 +19,13 @@
         <span class="brand-name">Immersive Taxonomy</span>
       </div>
 
-      <!-- Mode switcher: exactly one mode is active at a time -->
+      <!-- Mode switcher: exactly one mode is active at a time.
+           The Edit tab is hidden for public visitors when cloud
+           sync is configured (script.js controls this). -->
       <nav class="mode-toggle" aria-label="Mode">
-        <button id="edit-mode-btn" class="mode-btn is-active" type="button">✏️ Edit</button>
-        <button id="idea-mode-btn" class="mode-btn" type="button">💡 Design Ideas</button>
+        <button id="idea-mode-btn" class="mode-btn is-active" type="button">💡 Design Ideas</button>
         <button id="inspire-mode-btn" class="mode-btn" type="button">✨ Inspiration</button>
+        <button id="edit-mode-btn" class="mode-btn" type="button">✏️ Edit</button>
       </nav>
     </div>
   </header>
@@ -36,37 +38,53 @@
     <h1>Design immersive experiences, <span class="gradient-text">one dimension at a time</span></h1>
     <p class="hero-sub">
       Every column below is a design dimension of an immersive experience — from how participants
-      interact, to how the story unfolds, to the technology that delivers it. Edit the framework,
-      combine its elements, or let a random recipe spark your next idea.
+      interact, to how the story unfolds, to the technology that delivers it. Click a column
+      heading to learn what it means, combine its elements, or let a random recipe spark your next idea.
     </p>
   </section>
 
   <main>
 
     <!-- ============================================================
-         EDIT MODE TOOLBAR (script.js shows/hides these panels)
+         EDIT MODE TOOLBAR (admins / local mode only)
          ============================================================ -->
-    <section id="edit-tools" class="panel" aria-label="Edit tools">
-      <div class="toolbar-group">
-        <button id="add-row-btn" class="btn" type="button">+ Add Row</button>
-        <button id="add-col-btn" class="btn" type="button">+ Add Column</button>
+    <section id="edit-tools" class="panel panel-stack" aria-label="Edit tools" hidden>
+      <div class="toolbar-row">
+        <div class="toolbar-group">
+          <button id="add-row-btn" class="btn" type="button">+ Add Row</button>
+          <button id="add-col-btn" class="btn" type="button">+ Add Column</button>
+        </div>
+        <!-- Cloud save status: Saving… / All changes saved / Save failed -->
+        <div class="cloud-bar">
+          <button id="save-now-btn" class="btn btn-brand" type="button">Save Now</button>
+          <button id="retry-save-btn" class="btn btn-danger" type="button" hidden>Retry Save</button>
+          <span id="sync-status" class="sync-status" role="status"></span>
+          <span id="last-saved" class="panel-note"></span>
+        </div>
       </div>
-      <div class="toolbar-group">
-        <button id="save-btn" class="btn btn-brand" type="button">Save</button>
-        <button id="export-btn" class="btn" type="button">Export JSON</button>
-        <button id="import-btn" class="btn" type="button">Import JSON</button>
-        <!-- Hidden file picker used by the Import button -->
-        <input id="import-file" type="file" accept=".json,application/json" hidden />
-        <button id="reset-btn" class="btn btn-danger" type="button">Reset to Default</button>
-      </div>
-      <span id="save-status" class="save-status" role="status"></span>
+
+      <!-- JSON import/export lives here now — out of the everyday
+           workflow, still available as an emergency backup. -->
+      <details class="backup-tools">
+        <summary>Backup Tools (advanced)</summary>
+        <div class="toolbar-group">
+          <button id="export-btn" class="btn" type="button">Export JSON</button>
+          <button id="import-btn" class="btn" type="button">Import JSON</button>
+          <input id="import-file" type="file" accept=".json,application/json" hidden />
+          <button id="restore-cloud-btn" class="btn" type="button" hidden>Restore Last Cloud Version</button>
+          <button id="reset-btn" class="btn btn-danger" type="button">Reset to Default</button>
+        </div>
+        <p class="panel-note">
+          Export downloads a JSON backup. Import replaces the current taxonomy after a
+          confirmation — nothing is overwritten silently.
+        </p>
+      </details>
     </section>
 
     <!-- ============================================================
          DESIGN IDEAS MODE TOOLBAR
          ============================================================ -->
     <section id="idea-tools" class="panel panel-stack" aria-label="Design ideas tools" hidden>
-      <!-- The shared topic input is moved into this slot by script.js -->
       <div id="idea-topic-slot"></div>
       <!-- Generation actions -->
       <div class="toolbar-group">
@@ -86,8 +104,6 @@
 
     <!-- ============================================================
          INSPIRATION MODE TOOLBAR
-         A complete random "recipe" — one value per column — with
-         per-column locks so favorites survive a reroll.
          ============================================================ -->
     <section id="inspire-tools" class="panel panel-stack" aria-label="Inspiration tools" hidden>
       <div id="inspire-topic-slot"></div>
@@ -117,9 +133,7 @@
     <p id="mode-hint" class="mode-hint"></p>
 
     <!-- ============================================================
-         THE WORKSPACE — the visual centerpiece.
-         Holds either the taxonomy grid (Edit / Design Ideas modes)
-         or the recipe board (Inspiration mode).
+         THE WORKSPACE — taxonomy grid or recipe board
          ============================================================ -->
     <section class="workspace">
       <div id="table-container" class="table-wrap"></div>
@@ -132,13 +146,89 @@
   </main>
 
   <!-- ============================================================
-       FOOTER — version info
+       FOOTER — version info + understated admin entry point
        ============================================================ -->
   <footer class="site-footer">
-    <p>Immersive Experience Design Taxonomy · v1.0</p>
-    <p>Runs entirely in your browser — no server, no account. Edits are saved locally via localStorage.</p>
+    <p>Immersive Experience Design Taxonomy · v2.0</p>
+    <p id="footer-note">Runs in your browser — no account needed to explore and generate ideas.</p>
+    <p>
+      <button id="admin-btn" class="admin-link" type="button">Admin sign in</button>
+      <span id="admin-status" class="admin-status"></span>
+    </p>
   </footer>
 
-  <script src="script.js"></script>
+  <!-- ============================================================
+       DIALOGS
+       <dialog> gives us Escape-to-close and focus containment
+       for free; script.js opens them with showModal().
+       ============================================================ -->
+
+  <!-- Read-only category description (Idea/Inspiration modes) -->
+  <dialog id="desc-modal" class="modal" aria-labelledby="desc-modal-title">
+    <div class="modal-head">
+      <h2 id="desc-modal-title"></h2>
+      <button id="desc-modal-close" class="modal-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <p id="desc-modal-short" class="modal-lead"></p>
+    <div id="desc-modal-detail-wrap">
+      <h3>In depth</h3>
+      <p id="desc-modal-detail"></p>
+    </div>
+    <div id="desc-modal-example-wrap">
+      <h3>Example</h3>
+      <p id="desc-modal-example"></p>
+    </div>
+  </dialog>
+
+  <!-- Category editor (Edit mode) -->
+  <dialog id="desc-editor" class="modal" aria-labelledby="desc-editor-title">
+    <div class="modal-head">
+      <h2 id="desc-editor-title">Edit Category</h2>
+      <button id="desc-editor-close" class="modal-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <label class="field">
+      <span>Category name</span>
+      <input id="edit-cat-name" type="text" />
+    </label>
+    <label class="field">
+      <span>Short description <small>(one sentence — shown as the tooltip)</small></span>
+      <textarea id="edit-cat-short" rows="2"></textarea>
+    </label>
+    <label class="field">
+      <span>Detailed description <small>(optional)</small></span>
+      <textarea id="edit-cat-detail" rows="4"></textarea>
+    </label>
+    <label class="field">
+      <span>Example or guidance <small>(optional)</small></span>
+      <textarea id="edit-cat-example" rows="3"></textarea>
+    </label>
+    <div class="modal-actions">
+      <button id="desc-editor-save" class="btn btn-primary" type="button">Save</button>
+      <button id="desc-editor-cancel" class="btn" type="button">Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- Administrator sign-in -->
+  <dialog id="login-modal" class="modal" aria-labelledby="login-title">
+    <div class="modal-head">
+      <h2 id="login-title">Administrator Sign In</h2>
+      <button id="login-close" class="modal-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <label class="field">
+      <span>Email</span>
+      <input id="login-email" type="email" autocomplete="username" />
+    </label>
+    <label class="field">
+      <span>Password</span>
+      <input id="login-password" type="password" autocomplete="current-password" />
+    </label>
+    <p id="login-error" class="login-error" hidden></p>
+    <div class="modal-actions">
+      <button id="login-submit" class="btn btn-primary" type="button">Sign In</button>
+      <button id="login-cancel" class="btn" type="button">Cancel</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="script.js"></script>
 </body>
 </html>

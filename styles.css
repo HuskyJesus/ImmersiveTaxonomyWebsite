@@ -565,6 +565,223 @@ tbody td {
 }
 
 /* ------------------------------------------------------------
+   Clickable column headers (Idea/Inspiration modes)
+   The ⓘ icon + hover lift make it obvious headers open info.
+   ------------------------------------------------------------ */
+.th-info {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.th-info:hover,
+.th-info:focus-visible {
+  background: var(--green-700);
+  transform: translateY(-1px);
+}
+
+.th-info:focus-visible {
+  outline: 2px solid var(--grad-a);
+  outline-offset: 2px;
+}
+
+.info-icon {
+  opacity: 0.75;
+  font-size: 0.9em;
+  font-weight: 400;
+}
+
+/* Recipe card dimension name doubles as an info button */
+.recipe-dimension-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green-700);
+}
+
+.recipe-dimension-btn:hover { text-decoration: underline; }
+
+/* ------------------------------------------------------------
+   Dialogs (description modal, category editor, admin sign-in)
+   ------------------------------------------------------------ */
+.modal {
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  padding: 26px 28px;
+  width: min(560px, calc(100vw - 32px));
+  color: var(--ink);
+}
+
+.modal::backdrop {
+  background: rgba(10, 31, 25, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal[open] { animation: rise 0.22s ease both; }
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+}
+
+.modal-close {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-close:hover { background: #fdecea; border-color: var(--danger); }
+
+.modal-lead {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--green-800);
+}
+
+.modal h3 {
+  margin: 18px 0 4px;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green-700);
+}
+
+.modal p { margin: 0; }
+
+/* Form fields inside the editor + login dialogs */
+.field {
+  display: block;
+  margin: 14px 0 0;
+}
+
+.field span {
+  display: block;
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-bottom: 4px;
+}
+
+.field small { font-weight: 400; color: var(--ink-soft); }
+
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--grad-a);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.login-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------
+   Cloud save status + backup tools (Edit mode)
+   ------------------------------------------------------------ */
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cloud-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sync-status {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.sync-status.is-ok      { color: var(--green-700); }
+.sync-status.is-info    { color: var(--ink-soft); }
+.sync-status.is-local   { color: var(--ink-soft); }
+.sync-status.is-pending { color: #b45309; }
+.sync-status.is-error   { color: var(--danger); }
+
+.backup-tools {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.backup-tools summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.backup-tools summary:hover { color: var(--ink); }
+
+.backup-tools .toolbar-group { margin-top: 12px; }
+
+/* ------------------------------------------------------------
+   Admin entry point (footer)
+   ------------------------------------------------------------ */
+.admin-link {
+  border: none;
+  background: transparent;
+  color: var(--green-100);
+  opacity: 0.7;
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.admin-link:hover { opacity: 1; }
+
+.admin-status { font-size: 0.8rem; opacity: 0.8; margin-left: 8px; }
+
+/* ------------------------------------------------------------
    Footer
    ------------------------------------------------------------ */
 .site-footer {
