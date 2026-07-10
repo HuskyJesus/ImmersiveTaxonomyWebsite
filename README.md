@@ -57,18 +57,29 @@ Cloud saving needs a free Firebase project. **No code changes are required beyon
 2. Replace everything with the contents of [`firestore.rules`](firestore.rules) from this repository.
 3. Leave `PASTE_ADMIN_UID_HERE` for now — you'll fill it in at step 5. Click **Publish**.
 
-### 4. Enable email/password sign-in and create the admin account
+### 4. Enable email/password sign-in and create the admin account(s)
 
 1. **Build → Authentication → Get started**.
 2. Under **Sign-in method**, enable **Email/Password** (just the first toggle).
-3. Under the **Users** tab, click **Add user** and create the administrator account (e.g. your father's email plus a strong password). This is the only account that will ever be needed.
+3. Under the **Users** tab, click **Add user** for each administrator (email plus a strong password). Any number of administrator accounts is supported.
 
-### 5. Put the admin UID into the rules
+### 5. Put the admin UID(s) into the rules
 
-1. Still in **Authentication → Users**, copy the value in the **User UID** column for the account you just created.
-2. Go back to **Firestore Database → Rules** and replace `PASTE_ADMIN_UID_HERE` with that UID (keep the quotes), e.g. `["a1B2c3D4e5F6..."]`. Click **Publish**.
+1. Still in **Authentication → Users**, copy the value in the **User UID** column for each administrator account.
+2. In **Firestore Database → Rules**, the `isAdmin()` function near the top of [`firestore.rules`](firestore.rules) holds the allowlist — one obvious place to manage edit access. Add one quoted UID per line, comma-separated:
 
-Creating a Firebase account does **not** grant edit access — only UIDs in this list can write.
+   ```
+   function isAdmin() {
+     return request.auth != null && request.auth.uid in [
+       "uid-of-first-admin",    // Father
+       "uid-of-second-admin"    // Site maintainer
+     ];
+   }
+   ```
+
+3. Click **Publish**. To add or remove an administrator later, edit this list and publish again — no website changes needed.
+
+Creating a Firebase account does **not** grant edit access — only UIDs in this list can write. (An account that signs in without being on the list can open Edit mode in their browser, but every save is rejected by Firestore with a clear "not on the admin allowlist" message.)
 
 ### 6. Add the web configuration to the site
 
