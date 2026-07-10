@@ -23,12 +23,12 @@
    ============================================================ */
 
 export const firebaseConfig = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE_AUTH_DOMAIN",            // e.g. my-project.firebaseapp.com
-  projectId: "PASTE_PROJECT_ID",
-  storageBucket: "PASTE_STORAGE_BUCKET",      // e.g. my-project.appspot.com
-  messagingSenderId: "PASTE_MESSAGING_SENDER_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyAWByBOCCSF4GL-sSuafariIbu-3tTy8MY",
+  authDomain: "immersivetaxonomywebsite.firebaseapp.com",
+  projectId: "immersivetaxonomywebsite",
+  storageBucket: "immersivetaxonomywebsite.firebasestorage.app",
+  messagingSenderId: "768236145566",
+  appId: "1:768236145566:web:e1297b81aed482b7b2648f"
 };
 
 /* True once real values have been pasted in above */
