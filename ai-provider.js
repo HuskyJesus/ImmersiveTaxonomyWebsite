@@ -14,9 +14,12 @@
      selections: [{
        column: string,            // dimension name
        columnDescription: string, // what the dimension controls
-       elementNumber: number,     // 0–4 within the dimension
        value: string,             // the chosen element
        valueDescription: string,  // what the element means
+       valueDetail: string,
+       participantRole: string,
+       designerResponsibility: string,
+       cautions: string,
        valueExample: string
      }]
    }
@@ -47,7 +50,11 @@ function buildPrompt(context) {
     .map(
       (s) =>
         `- ${s.column} (${s.columnDescription || "a design dimension"}): ` +
-        `Element ${s.elementNumber ?? "?"} "${s.value}" — ${s.valueDescription || "no description"}` +
+        `"${s.value}" — ${s.valueDescription || "no description"}` +
+        (s.valueDetail ? ` Details: ${s.valueDetail}` : "") +
+        (s.participantRole ? ` Participant role: ${s.participantRole}` : "") +
+        (s.designerResponsibility ? ` Designer responsibility: ${s.designerResponsibility}` : "") +
+        (s.cautions ? ` Caution: ${s.cautions}` : "") +
         (s.valueExample ? ` (example of this element in use: ${s.valueExample})` : "")
     )
     .join("\n");
@@ -96,7 +103,7 @@ Write one immersive experience concept as a design brief. Respond with ONLY a JS
 - "facilitator": the facilitator or secondary-perspective layer, if any
 - "risks": 1-2 design risks or open questions the designer should resolve
 and one array field:
-- "rationale": one entry per design decision, each an object {"col": dimension name, "colMeaning": what the dimension controls, "values": ["Element N: chosen element"], "note": one sentence on how this concept honors that choice}`;
+- "rationale": one entry per design decision, each an object {"col": dimension name, "colMeaning": what the dimension controls, "values": ["chosen element"], "note": one sentence on how this concept honors that choice}`;
 
   return { system, user };
 }

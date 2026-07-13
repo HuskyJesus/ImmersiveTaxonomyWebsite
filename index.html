@@ -3,397 +3,97 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IXD — Immersive Experience Design Taxonomy</title>
-  <meta name="description" content="A map of immersive design possibilities. Explore ten design dimensions, make intentional choices, and generate complete immersive experience concepts. Based on the taxonomy developed by JJ Ruscella." />
+  <title>Immersive Experience Design Taxonomy</title>
+  <meta name="description" content="A map of immersive design possibilities based on JJ Ruscella's Immersive Experience Design Taxonomy." />
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-
-  <!-- ============================================================
-       SITE HEADER — brand, simple navigation, account controls
-       ============================================================ -->
+<body class="about-page">
   <header class="site-header">
     <div class="header-inner">
-      <div class="brand">
+      <a class="brand brand-link" href="index.html">
         <span class="brand-mark" aria-hidden="true">IXD</span>
         <span class="brand-name">Immersive Taxonomy</span>
-      </div>
+      </a>
 
       <nav class="site-nav" aria-label="Site">
-        <a href="#workspace">Design</a>
-        <a href="#about">About</a>
-        <a href="#book">The Book</a>
+        <a href="index.html">About</a>
+        <a href="design.html">Design</a>
+        <a href="index.html#book">The Book</a>
       </nav>
 
       <div class="header-actions">
-        <!-- Admins only -->
-        <button id="edit-mode-btn" class="account-btn" type="button" hidden>Edit Taxonomy</button>
-
-        <div id="account-area" class="account-area" hidden>
-          <div id="auth-buttons">
-            <button id="signin-btn" class="account-btn" type="button">Sign In</button>
-            <button id="signup-btn" class="account-btn account-btn-solid" type="button">Sign Up</button>
-          </div>
-          <div id="account-menu-wrap" class="account-menu-wrap" hidden>
-            <button id="account-btn" class="account-btn" type="button" aria-haspopup="true" aria-expanded="false">
-              <span id="account-initial" class="account-initial" aria-hidden="true"></span>
-              <span id="account-name" class="account-name"></span>
-              <span aria-hidden="true">▾</span>
-            </button>
-            <div id="account-dropdown" class="account-dropdown" hidden>
-              <button id="menu-library-btn" type="button">Saved Experiences</button>
-              <button id="menu-signout-btn" type="button">Sign Out</button>
-            </div>
-          </div>
-        </div>
+        <a class="account-btn account-btn-solid" href="design.html">Start Designing</a>
       </div>
     </div>
   </header>
 
-  <!-- ============================================================
-       LANDING — a brief introduction, then Start Designing
-       ============================================================ -->
-  <section id="landing" class="landing">
-    <p class="hero-eyebrow">A map of immersive design possibilities</p>
-    <h1>The Immersive Experience<br /><span class="gradient-text">Design Taxonomy</span></h1>
-    <p class="hero-sub">
-      Ten design dimensions. Five elements in each. One intentional way to turn any topic —
-      a lesson, a story, an exhibition, a training — into an immersive experience.
-    </p>
-
-    <div class="landing-actions">
-      <a class="btn btn-primary btn-large" href="#workspace">Start Designing</a>
-      <a class="btn btn-quiet" href="#about">About the Taxonomy</a>
-    </div>
-
-    <!-- What the taxonomy is — and importantly, what it is not -->
-    <ul class="landing-framing">
-      <li><strong>A map, not a checklist.</strong> Each dimension lays out the possibilities for one design decision.</li>
-      <li><strong>Not a score.</strong> Element 4 is not "better" than Element 0 — the right element depends on the purpose of the experience.</li>
-      <li><strong>Technology amplifies immersion; it doesn't create it.</strong> Some of the most immersive experiences use no technology at all.</li>
-    </ul>
-
-    <p class="landing-attribution">
-      Based on the immersive experience design taxonomy developed by JJ Ruscella in
-      <em>“Immersion: The New Art Form — A Handbook for the Immersive Experience Designer.”</em>
-    </p>
-  </section>
-
-  <!-- ============================================================
-       ABOUT — who it's for, the problem, how it works + video
-       ============================================================ -->
-  <section id="about" class="intro">
-    <h2 class="section-title">About the taxonomy</h2>
-    <div class="intro-grid">
-      <div class="intro-card">
-        <h3>What it is</h3>
-        <p>A framework that names the ten decisions every immersive experience makes — from how
-        people interact and how present they feel, to how the story works and what the
-        experience knows about its participants — and the five elements possible within each.</p>
+  <main class="about-main">
+    <section class="landing about-landing">
+      <p class="hero-eyebrow">A map of immersive design possibilities</p>
+      <h1>The Immersive Experience<br /><span class="gradient-text">Design Taxonomy</span></h1>
+      <p class="hero-sub">
+        A practical framework for turning lessons, stories, exhibitions, trainings, and performances
+        into intentional immersive experiences.
+      </p>
+      <div class="landing-actions">
+        <a class="btn btn-primary btn-large" href="design.html">Start Designing</a>
+        <a class="btn btn-quiet" href="#book">The Book</a>
       </div>
-      <div class="intro-card">
-        <h3>Who it's for</h3>
-        <p>Educators, designers, researchers, and storytellers — anyone who wants people to
-        <em>experience</em> a subject rather than just hear about it. No background in
-        immersive design is needed.</p>
-      </div>
-      <div class="intro-card">
-        <h3>The problem it solves</h3>
-        <p>Immersive experiences usually get designed by instinct: pick a technology, add a story,
-        hope it works. Important decisions — how people participate, why they stay engaged, what
-        they take away — get made by accident instead of on purpose.</p>
-      </div>
-      <div class="intro-card">
-        <h3>How it works</h3>
-        <p>Enter your topic, then choose one element in each dimension that serves your purpose —
-        or lock the choices you're sure of and randomize the rest as a brainstorming start. The
-        generator turns your design profile into a complete experience concept you can refine
-        and save.</p>
-      </div>
-    </div>
-
-    <div class="video-section">
-      <h2>Watch the taxonomy in action</h2>
-      <p class="section-sub">A short walkthrough of the framework — from choosing a topic to a finished experience concept.</p>
-      <div id="video-frame" class="video-frame">
-        <div class="video-placeholder">
-          <span class="video-placeholder-mark">▶</span>
-          <p>Walkthrough video coming soon</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       THE DESIGN WORKSPACE
-       Topic + generation controls, search, the taxonomy table,
-       and the generated result — all freely accessible, in a
-       natural top-to-bottom reading order. No steps, no gates.
-       ============================================================ -->
-  <main id="workspace" class="workspace-anchor">
-
-    <!-- Admin edit toolbar (admins only, while editing) -->
-    <section id="edit-tools" class="panel panel-stack" aria-label="Edit tools" hidden>
-      <div class="toolbar-row">
-        <div class="toolbar-group">
-          <button id="add-row-btn" class="btn" type="button">+ Add Element Row</button>
-          <button id="add-col-btn" class="btn" type="button">+ Add Dimension</button>
-        </div>
-        <div class="cloud-bar">
-          <button id="save-now-btn" class="btn btn-brand" type="button">Save Now</button>
-          <button id="retry-save-btn" class="btn btn-danger" type="button" hidden>Retry Save</button>
-          <span id="sync-status" class="sync-status" role="status"></span>
-          <span id="last-saved" class="panel-note"></span>
-        </div>
-      </div>
-      <details class="backup-tools">
-        <summary>Backup Tools (advanced)</summary>
-        <div class="toolbar-group">
-          <button id="export-btn" class="btn" type="button">Export JSON</button>
-          <button id="import-btn" class="btn" type="button">Import JSON</button>
-          <input id="import-file" type="file" accept=".json,application/json" hidden />
-          <button id="restore-cloud-btn" class="btn" type="button" hidden>Restore Last Cloud Version</button>
-          <button id="reset-btn" class="btn btn-danger" type="button">Restore Manuscript Defaults</button>
-        </div>
-        <p class="panel-note">
-          Export downloads a JSON backup. Import replaces the current taxonomy after a
-          confirmation — nothing is overwritten silently.
-        </p>
-      </details>
     </section>
 
-    <!-- Topic + generation controls -->
-    <section class="panel panel-stack workspace-controls">
-      <div class="topic-area">
-        <label for="topic-input" class="topic-label">Experience Focus</label>
-        <p class="topic-help">Enter the subject, lesson, story, or problem you want to turn into an immersive experience.</p>
-        <input
-          id="topic-input"
-          type="text"
-          placeholder='Try “cooking,” “the history of the Civil War,” “onboarding new nurses,” “creative writing within nonfiction,” “marine conservation,” or “conflict resolution”'
-          aria-label="Experience focus"
-        />
-        <p id="topic-hint" class="topic-hint" hidden></p>
-      </div>
-
-      <div class="gen-controls">
-        <div class="toolbar-group">
-          <button id="generate-btn" class="btn btn-primary" type="button">Generate Experience</button>
-          <button id="random-path-btn" class="btn btn-brand" type="button"
-            title="Keeps your locked elements, randomizes every other dimension, and generates. A random profile is a starting point to revise — not a finished design.">
-            Generate From Random Path
-          </button>
-          <button id="regen-btn" class="btn" type="button"
-            title="Same topic and selections, a fresh interpretation">Regenerate</button>
+    <section id="about" class="intro page-section">
+      <h2 class="section-title">About the taxonomy</h2>
+      <div class="intro-grid">
+        <div class="intro-card">
+          <h3>What it is</h3>
+          <p>The taxonomy is a map of ten design dimensions that appear across immersive experiences: interactivity, embodiment, co-participation, story, dynamics, gamification, immersive technology, meta-control, didactic capacity, and data.</p>
         </div>
-        <div class="toolbar-group">
-          <button id="randomize-btn" class="btn btn-quiet" type="button"
-            title="Keeps your locked elements and picks one random element in every unlocked dimension. Does not generate.">
-            Randomize Unlocked Elements
-          </button>
-          <button id="clear-btn" class="btn btn-quiet" type="button">Clear Selections</button>
-          <button id="clear-locks-btn" class="btn btn-quiet" type="button">Clear Locks</button>
+        <div class="intro-card">
+          <h3>Who it is for</h3>
+          <p>Artists, educators, instructional designers, storytellers, researchers, trainers, performers, and immersive experience designers can use it to name choices that are often made by instinct.</p>
+        </div>
+        <div class="intro-card">
+          <h3>What it helps solve</h3>
+          <p>It supports brainstorming, concept development, reviewing existing experiences, finding missing design opportunities, teaching immersive design, and refining intentional choices before production begins.</p>
+        </div>
+        <div class="intro-card">
+          <h3>How designers use it</h3>
+          <p>Choose a topic, then explore one element in each dimension. The result is not a score or checklist; it is a design profile that helps clarify what kind of experience you are building and why.</p>
         </div>
       </div>
-      <p id="selection-summary" class="panel-note"></p>
+
+      <ul class="landing-framing">
+        <li><strong>A map, not a checklist.</strong> Each dimension opens a family of design possibilities.</li>
+        <li><strong>Not a score.</strong> Every experience does not need the highest element; the right choice depends on the purpose.</li>
+        <li><strong>Technology is an amplifier.</strong> Immersive technology can deepen presence, but it is not the art itself.</li>
+      </ul>
     </section>
 
-    <!-- Search -->
-    <div class="search-bar">
-      <input
-        id="search-input"
-        type="search"
-        placeholder="Search the taxonomy — dimensions, elements, descriptions, examples…"
-        autocomplete="off"
-        aria-label="Search the taxonomy"
-      />
-      <div id="search-results" class="search-results" hidden role="listbox"></div>
-    </div>
-
-    <!-- The taxonomy table — the centerpiece -->
-    <section class="workspace">
-      <div id="table-container" class="table-wrap" tabindex="0" aria-label="The taxonomy table (scrolls horizontally)"></div>
-      <p class="scroll-cue" aria-hidden="true">Scroll horizontally to see all ten dimensions</p>
+    <section id="book" class="book-section page-section">
+      <h2>The Book</h2>
+      <p class="section-sub">
+        Based on the immersive experience design taxonomy developed by JJ Ruscella in
+        <em>"Immersion: The New Art Form - A Handbook for the Immersive Experience Designer."</em>
+      </p>
+      <p>
+        The book frames immersive experience design as a new stage for artists, educators,
+        performers, technologists, and subject-matter experts. It presents the taxonomy as a
+        practical way to see opportunity: not a rigid rubric, but a language for building worlds
+        people can enter, influence, remember, and learn from.
+      </p>
+      <div class="landing-actions">
+        <a class="btn btn-primary" href="design.html">Start Designing</a>
+      </div>
     </section>
-
-    <!-- The generated experience -->
-    <section id="result-section" class="panel panel-stack" hidden>
-      <div id="idea-output" class="idea-output"></div>
-      <div id="idea-actions" class="idea-actions"></div>
-    </section>
-
   </main>
 
-  <!-- ============================================================
-       THE BOOK
-       ============================================================ -->
-  <section id="book" class="book-section">
-    <h2>The companion book</h2>
-    <p class="section-sub">
-      This taxonomy comes from <em>“Immersion: The New Art Form — A Handbook for the Immersive
-      Experience Designer”</em> by JJ Ruscella. Cover, summary, chapter references, and
-      availability will appear here.
-    </p>
-    <p class="panel-note">Coming soon.</p>
-  </section>
-
-  <!-- ============================================================
-       FOOTER
-       ============================================================ -->
   <footer class="site-footer">
-    <p class="footer-brand">IXD — Immersive Experience Design</p>
-    <p>Taxonomy by JJ Ruscella, from <em>“Immersion: The New Art Form — A Handbook for the Immersive Experience Designer”</em></p>
-    <p>Website by Ruscella Obeid · A Ruscella Immersive project</p>
-    <p>
-      Version 5.0 ·
-      <a href="https://github.com/HuskyJesus/ImmersiveTaxonomyWebsite" target="_blank" rel="noopener">GitHub</a>
-    </p>
+    <p class="footer-brand">Ruscella Obeid</p>
+    <p>Taxonomy by JJ Ruscella, from <em>"Immersion: The New Art Form - A Handbook for the Immersive Experience Designer"</em></p>
     <p id="footer-copyright"></p>
   </footer>
-
-  <!-- ============================================================
-       DIALOGS
-       ============================================================ -->
-
-  <!-- Read-only description viewer (dimensions AND elements).
-       Body sections are rendered by script.js so manuscript
-       fields appear only when they have content. -->
-  <dialog id="desc-modal" class="modal" aria-labelledby="desc-modal-title">
-    <div class="modal-head">
-      <div>
-        <p id="desc-modal-context" class="modal-context" hidden></p>
-        <h2 id="desc-modal-title"></h2>
-      </div>
-      <button id="desc-modal-close" class="modal-close" type="button" aria-label="Close">✕</button>
-    </div>
-    <p id="desc-modal-short" class="modal-lead"></p>
-    <div id="desc-modal-sections"></div>
-    <div class="modal-actions">
-      <button id="desc-modal-select" class="btn btn-primary" type="button" hidden>Select This Element</button>
-    </div>
-  </dialog>
-
-  <!-- Description editor (Edit mode — dimensions AND elements) -->
-  <dialog id="desc-editor" class="modal" aria-labelledby="desc-editor-title">
-    <div class="modal-head">
-      <h2 id="desc-editor-title">Edit</h2>
-      <button id="desc-editor-close" class="modal-close" type="button" aria-label="Close">✕</button>
-    </div>
-    <label class="field">
-      <span id="edit-cat-name-label">Name</span>
-      <input id="edit-cat-name" type="text" />
-    </label>
-    <label class="field">
-      <span>Short description <small>(one sentence — shown as the tooltip)</small></span>
-      <textarea id="edit-cat-short" rows="2"></textarea>
-    </label>
-    <label class="field">
-      <span>Detailed description</span>
-      <textarea id="edit-cat-detail" rows="4"></textarea>
-    </label>
-    <label class="field">
-      <span>Example</span>
-      <textarea id="edit-cat-example" rows="3"></textarea>
-    </label>
-
-    <!-- Manuscript-derived fields (labels swap for dimension/element) -->
-    <details class="editor-extras" id="editor-extras">
-      <summary>Manuscript fields</summary>
-      <label class="field"><span id="edit-extra-label-1"></span><textarea id="edit-extra-1" rows="2"></textarea></label>
-      <label class="field"><span id="edit-extra-label-2"></span><textarea id="edit-extra-2" rows="2"></textarea></label>
-      <label class="field"><span id="edit-extra-label-3"></span><textarea id="edit-extra-3" rows="2"></textarea></label>
-      <label class="field"><span id="edit-extra-label-4"></span><textarea id="edit-extra-4" rows="2"></textarea></label>
-      <label class="field"><span id="edit-extra-label-5"></span><input id="edit-extra-5" type="text" /></label>
-    </details>
-
-    <p class="panel-note" id="editor-default-hint"></p>
-    <div class="modal-actions">
-      <button id="desc-editor-save" class="btn btn-primary" type="button">Save</button>
-      <button id="desc-editor-default" class="btn" type="button" hidden>Compare / Restore Default</button>
-      <button id="desc-editor-cancel" class="btn" type="button">Cancel</button>
-    </div>
-  </dialog>
-
-  <!-- Authentication: sign in / sign up / password reset -->
-  <dialog id="auth-modal" class="modal" aria-labelledby="auth-title">
-    <div class="modal-head">
-      <h2 id="auth-title">Sign In</h2>
-      <button id="auth-close" class="modal-close" type="button" aria-label="Close">✕</button>
-    </div>
-    <label class="field" id="auth-name-field" hidden>
-      <span>Display name</span>
-      <input id="auth-name" type="text" autocomplete="name" />
-    </label>
-    <label class="field">
-      <span>Email</span>
-      <input id="auth-email" type="email" autocomplete="username" />
-    </label>
-    <label class="field" id="auth-password-field">
-      <span>Password</span>
-      <input id="auth-password" type="password" autocomplete="current-password" />
-    </label>
-    <label class="field" id="auth-confirm-field" hidden>
-      <span>Confirm password</span>
-      <input id="auth-confirm" type="password" autocomplete="new-password" />
-    </label>
-    <p id="auth-error" class="login-error" hidden></p>
-    <p id="auth-info" class="auth-info" hidden></p>
-    <div class="modal-actions">
-      <button id="auth-submit" class="btn btn-primary" type="button">Sign In</button>
-      <button id="auth-cancel" class="btn" type="button">Cancel</button>
-    </div>
-    <p class="auth-links">
-      <button id="auth-to-signup" class="link-btn" type="button">Create an account</button>
-      <button id="auth-to-signin" class="link-btn" type="button" hidden>Have an account? Sign in</button>
-      <button id="auth-to-reset" class="link-btn" type="button">Forgot password?</button>
-    </p>
-  </dialog>
-
-  <!-- Saved Experiences library -->
-  <dialog id="library-modal" class="modal modal-wide" aria-labelledby="library-title">
-    <div class="modal-head">
-      <h2 id="library-title">Saved Experiences</h2>
-      <button id="library-close" class="modal-close" type="button" aria-label="Close">✕</button>
-    </div>
-
-    <div id="library-list-view">
-      <div class="library-controls">
-        <input id="lib-search" type="search" placeholder="Search title, topic, notes…" aria-label="Search saved experiences" />
-        <select id="lib-sort" aria-label="Sort saved experiences">
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="title">Title A–Z</option>
-          <option value="favorite">Favorites first</option>
-        </select>
-        <label class="lib-filter"><input id="lib-fav-only" type="checkbox" /> Favorites only</label>
-      </div>
-      <div id="lib-list" class="lib-list"></div>
-      <p id="lib-empty" class="panel-note" hidden>Nothing saved yet — generate an experience and press “Save Experience”.</p>
-    </div>
-
-    <div id="library-detail-view" hidden>
-      <button id="lib-back" class="btn" type="button">← Back to list</button>
-      <div class="lib-detail-head">
-        <input id="lib-title" class="lib-title-input" type="text" aria-label="Experience title" />
-        <button id="lib-fav" class="icon-btn lib-fav-btn" type="button" title="Toggle favorite">☆</button>
-      </div>
-      <p id="lib-meta" class="panel-note"></p>
-      <div id="lib-chips" class="recipe-chips"></div>
-      <label class="field">
-        <span>Notes</span>
-        <textarea id="lib-notes" rows="3" placeholder="Your notes about this experience…"></textarea>
-      </label>
-      <div class="toolbar-group lib-actions">
-        <button id="lib-save-changes" class="btn btn-primary" type="button">Save Changes</button>
-        <button id="lib-load" class="btn btn-brand" type="button">Load Into Workspace</button>
-        <button id="lib-regen" class="btn" type="button">Regenerate Variation</button>
-        <button id="lib-duplicate" class="btn" type="button">Duplicate</button>
-        <button id="lib-delete" class="btn btn-danger" type="button">Delete</button>
-      </div>
-      <div id="lib-content" class="lib-content"></div>
-    </div>
-  </dialog>
-
-  <script type="module" src="script.js"></script>
+  <script>
+    document.getElementById("footer-copyright").textContent = "© " + new Date().getFullYear() + " Ruscella Immersive. All rights reserved.";
+  </script>
 </body>
 </html>

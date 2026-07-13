@@ -90,13 +90,15 @@ const ICON_LOCK_CLOSED =
   '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H4a1.5 1.5 0 0 0-1.5 1.5v5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-5A1.5 1.5 0 0 0 12 6h-.5V4.5A3.5 3.5 0 0 0 8 1zm2 5H6V4.5a2 2 0 1 1 4 0V6z"/></svg>';
 const ICON_LOCK_OPEN =
   '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M11.5 1A3.5 3.5 0 0 0 8 4.5V6H4a1.5 1.5 0 0 0-1.5 1.5v5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-5A1.5 1.5 0 0 0 12 6H9.5V4.5a2 2 0 1 1 4 0V5h1.5v-.5A3.5 3.5 0 0 0 11.5 1z"/></svg>';
+const ICON_INFO =
+  '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM7.25 6.75h1.5v4.5h-1.5v-4.5ZM8 5.75a.9.9 0 1 1 0-1.8.9.9 0 0 1 0 1.8Z"/></svg>';
 
 /* The manuscript-content fields carried by columns and elements */
 const COLUMN_EXTRA_FIELDS = [
   ["subtitle", "Chapter framing subtitle"],
   ["designQuestion", "Central design question"],
   ["whyItMatters", "Why it matters"],
-  ["progression", "Progression from Element 0 to Element 4"],
+  ["progression", "Five-element progression"],
   ["source", "Source chapter"]
 ];
 const VALUE_EXTRA_FIELDS = [
@@ -104,8 +106,83 @@ const VALUE_EXTRA_FIELDS = [
   ["designerResponsibility", "Designer responsibility"],
   ["useCases", "Appropriate use cases"],
   ["cautions", "Cautions"],
-  ["source", "Source chapter and section"]
+  ["source", "Source chapter and section"],
+  ["keywords", "Search keywords"]
 ];
+
+const LEGACY_COLUMN_NAMES = {
+  Motivation: "Gamification",
+  Tech: "Immersive Technology",
+  Learning: "Didactic Capacity"
+};
+
+const LEGACY_VALUE_NAMES = {
+  "Single Person": "Single Player",
+  Predetermined: "Pre-Determined",
+  Observer: "Watcher",
+  "First Person POV": "First-Person POV",
+  "Movement Control": "Movement",
+  "Human to Human": "Human-to-Human Interaction",
+  "One on One": "One-on-One",
+  MMO: "MMO (Massively Multiplayer Online)",
+  "Pre-created": "Pre-Created Story",
+  "Choose your own": "Choose Your Own",
+  "Adaptive Story": "Interactive Story",
+  "Conversational Reality": "Convo-Reality",
+  "Adjustible POV": "Adjustable POV",
+  "Basic Mechanics": "Instruction",
+  Challenge: "External Process",
+  AR: "Augmented Reality (AR)",
+  VR: "Virtual Reality (VR)",
+  XR: "XR (Extended/Cross Reality)",
+  "2D": "360° Media",
+  Journey: "The Chosen Path",
+  Character: "The Mirror Self",
+  "World Editor": "The World Builder",
+  "World Builder": "The World Master",
+  Sythensis: "Synthesis",
+  "In-session": "In-Game",
+  Personalized: "Personalization",
+  Biometric: "Biometrics"
+};
+
+const LEGACY_VALUE_NAMES_BY_COLUMN = {
+  motivation: {
+    None: "Ungamified"
+  },
+  story: {
+    None: "No Story"
+  },
+  "meta-control": {
+    None: "The Passive Watcher",
+    Journey: "The Chosen Path",
+    Character: "The Mirror Self"
+  },
+  tech: {
+    none: "None",
+    AR: "Augmented Reality (AR)",
+    VR: "Virtual Reality (VR)",
+    XR: "XR (Extended/Cross Reality)",
+    "2D": "360° Media"
+  }
+};
+
+function reorderKnownDefaultColumns(data) {
+  const defaults = buildDefaultTaxonomy();
+  const order = defaults.columns.map((c) => c.id);
+  const indexById = Object.fromEntries(data.columns.map((c, i) => [c.id, i]));
+  if (!order.every((id) => indexById[id] !== undefined)) return data;
+
+  const remaining = data.columns
+    .map((c, i) => ({ id: c.id, index: i }))
+    .filter((entry) => !order.includes(entry.id))
+    .map((entry) => entry.index);
+  const newOrder = [...order.map((id) => indexById[id]), ...remaining];
+
+  data.columns = newOrder.map((oldIndex) => data.columns[oldIndex]);
+  data.rows = data.rows.map((row) => newOrder.map((oldIndex) => row[oldIndex]));
+  return data;
+}
 
 /* ------------------------------------------------------------
    2. APP STATE
@@ -147,11 +224,23 @@ function makeValueId(text) {
 }
 
 function blankColumnExtras() {
-  return Object.fromEntries(COLUMN_EXTRA_FIELDS.map(([k]) => [k, ""]));
+  return {
+    ...Object.fromEntries(COLUMN_EXTRA_FIELDS.map(([k]) => [k, ""])),
+    sourceType: "custom",
+    hasCustomEdits: true,
+    lastEditedAt: "",
+    lastEditedBy: ""
+  };
 }
 
 function blankValueExtras() {
-  return Object.fromEntries(VALUE_EXTRA_FIELDS.map(([k]) => [k, ""]));
+  return {
+    ...Object.fromEntries(VALUE_EXTRA_FIELDS.map(([k]) => [k, ""])),
+    sourceType: "custom",
+    hasCustomEdits: true,
+    lastEditedAt: "",
+    lastEditedBy: ""
+  };
 }
 
 function makeCell(text = "") {
@@ -210,18 +299,42 @@ function isValidV1(data) {
    how pre-existing cloud/local data gains the new manuscript
    fields without losing anything. */
 function tidyV3(data) {
+  data = reorderKnownDefaultColumns(data);
+  const defaults = buildDefaultTaxonomy();
+  const defaultsByColumnId = Object.fromEntries(defaults.columns.map((c, i) => [c.id, { col: c, index: i }]));
+
   data.columns.forEach((c) => {
+    c.name = LEGACY_COLUMN_NAMES[c.name] || c.name;
+    const def = defaultsByColumnId[c.id]?.col;
+    if (def && (!c.hasCustomEdits || c.sourceType === "manuscript-derived")) {
+      Object.assign(c, structuredClone(def), { id: c.id });
+    }
     c.shortDescription = c.shortDescription || "";
     c.detailedDescription = c.detailedDescription || "";
     c.example = c.example || "";
     COLUMN_EXTRA_FIELDS.forEach(([k]) => { c[k] = c[k] || ""; });
+    c.sourceType = c.sourceType || "custom";
+    c.hasCustomEdits = !!c.hasCustomEdits;
+    c.lastEditedAt = c.lastEditedAt || "";
+    c.lastEditedBy = c.lastEditedBy || "";
   });
-  data.rows.forEach((row) =>
-    row.forEach((cell) => {
+  data.rows.forEach((row, rowIndex) =>
+    row.forEach((cell, cIndex) => {
+      const colId = data.columns[cIndex]?.id;
+      cell.text = LEGACY_VALUE_NAMES_BY_COLUMN[colId]?.[cell.text] || LEGACY_VALUE_NAMES[cell.text] || cell.text;
+      const defMeta = defaultsByColumnId[data.columns[cIndex]?.id];
+      const defCell = defMeta && rowIndex < defaults.rows.length ? defaults.rows[rowIndex][defMeta.index] : null;
+      if (defCell && (!cell.hasCustomEdits || cell.sourceType === "manuscript-derived")) {
+        Object.assign(cell, structuredClone(defCell), { id: cell.id });
+      }
       cell.shortDescription = cell.shortDescription || "";
       cell.detailedDescription = cell.detailedDescription || "";
       cell.example = cell.example || "";
       VALUE_EXTRA_FIELDS.forEach(([k]) => { cell[k] = cell[k] || ""; });
+      cell.sourceType = cell.sourceType || "custom";
+      cell.hasCustomEdits = !!cell.hasCustomEdits;
+      cell.lastEditedAt = cell.lastEditedAt || "";
+      cell.lastEditedBy = cell.lastEditedBy || "";
     })
   );
   return data;
@@ -764,7 +877,7 @@ function renderLibraryList() {
       ? new Date(it.data.createdAt.toMillis()).toLocaleDateString()
       : "";
     row.innerHTML = `
-      <span class="lib-item-fav">${it.data.favorite ? "★" : "☆"}</span>
+      <span class="lib-item-fav">${it.data.favorite ? "Favorite" : ""}</span>
       <span class="lib-item-main"><strong></strong><small></small></span>`;
     row.querySelector("strong").textContent = it.data.title;
     row.querySelector("small").textContent = `${it.data.topic} · ${when}`;
@@ -780,7 +893,7 @@ function openLibraryDetail(item) {
   $("library-detail-view").hidden = false;
   $("lib-title").value = d.title;
   $("lib-notes").value = d.notes || "";
-  $("lib-fav").textContent = d.favorite ? "★" : "☆";
+  $("lib-fav").textContent = d.favorite ? "Unfavorite" : "Favorite";
   const fmt = (ts) => (ts?.toMillis?.() ? new Date(ts.toMillis()).toLocaleString() : "—");
   $("lib-meta").textContent = `Topic: ${d.topic} · Created ${fmt(d.createdAt)} · Last edited ${fmt(d.updatedAt)}`;
   $("lib-chips").innerHTML = (d.selections || [])
@@ -818,7 +931,7 @@ async function toggleLibraryFavorite() {
       favorite: next, updatedAt: serverTimestamp()
     });
     libraryOpenItem.data.favorite = next;
-    $("lib-fav").textContent = next ? "★" : "☆";
+    $("lib-fav").textContent = next ? "Unfavorite" : "Favorite";
   } catch (err) {
     alert("Could not update favorite: " + err.message);
   }
@@ -891,9 +1004,9 @@ function libraryRegenerate() {
 /* ------------------------------------------------------------
    10. RENDERING — THE TAXONOMY TABLE
    Headers: dimension name + optional subtitle + info affordance.
-   Cells: element number, name, one-line meaning, an info control,
-   and (when selected) a lock control. The three controls never
-   interfere: click selects, "i" informs, the padlock locks.
+   Public cells show only the element name plus info/lock controls.
+   The three controls never interfere: click selects, "i" informs,
+   the padlock locks.
    ------------------------------------------------------------ */
 function renderTable() {
   const container = $("table-container");
@@ -1014,19 +1127,20 @@ function renderTable() {
             : `Click to choose “${cell.text}” for ${taxonomy.columns[colIndex].name}.`;
         }
 
+        const label = document.createElement("span");
+        label.className = "cell-text";
+        label.textContent = cell.text;
+
         const top = document.createElement("span");
         top.className = "cell-top";
-        const num = document.createElement("span");
-        num.className = "cell-num";
-        num.textContent = `Element ${rowIndex}`;
-        top.append(num);
+        top.append(label);
 
         if (cell.text.trim() !== "") {
           const info = document.createElement("button");
           info.className = "cell-info-btn";
           info.setAttribute("aria-label", `About ${cell.text}`);
           info.title = `What does “${cell.text}” mean?`;
-          info.textContent = "i";
+          info.innerHTML = ICON_INFO;
           info.addEventListener("click", (e) => {
             e.stopPropagation();   // info never selects or locks
             openInfoModal({ type: "value", c: colIndex, r: rowIndex });
@@ -1049,18 +1163,7 @@ function renderTable() {
           }
         }
 
-        const label = document.createElement("span");
-        label.className = "cell-text";
-        label.textContent = cell.text;
-
-        td.append(top, label);
-
-        if (cell.shortDescription && cell.text.trim() !== "") {
-          const subEl = document.createElement("span");
-          subEl.className = "cell-sub";
-          subEl.textContent = cell.shortDescription;
-          td.append(subEl);
-        }
+        td.append(top);
 
         td.addEventListener("click", () => toggleCell(key, colIndex));
       }
@@ -1119,7 +1222,7 @@ function openInfoModal(target) {
 
   $("desc-modal-context").hidden = false;
   $("desc-modal-context").textContent = isValue
-    ? `${taxonomy.columns[target.c].name} · Element ${target.r}`
+    ? taxonomy.columns[target.c].name
     : (rec.subtitle || "Design dimension");
   $("desc-modal-title").textContent = isValue ? rec.text : rec.name;
   $("desc-modal-short").textContent =
@@ -1139,7 +1242,7 @@ function openInfoModal(target) {
   } else {
     add("Central design question", rec.designQuestion);
     add("Why it matters", rec.whyItMatters);
-    add("Progression from Element 0 to Element 4", rec.progression);
+    add("Five-element progression", rec.progression);
     add("Example", rec.example);
     add("Source", rec.source);
   }
@@ -1171,7 +1274,7 @@ function openEditor(target) {
   const rec = targetRecord(target);
   const isValue = target.type === "value";
   $("desc-editor-title").textContent = isValue
-    ? `Edit Element ${target.r} in “${taxonomy.columns[target.c].name}”`
+    ? `Edit “${rec.text}” in “${taxonomy.columns[target.c].name}”`
     : `Edit “${rec.name}”`;
   $("edit-cat-name-label").textContent = isValue ? "Element name" : "Dimension name";
   $("edit-cat-name").value = isValue ? rec.text : rec.name;
@@ -1257,6 +1360,10 @@ function saveEditor() {
   extrasFor(editingTarget.type).forEach(([key], i) => {
     rec[key] = $(`edit-extra-${i + 1}`).value.trim();
   });
+  rec.sourceType = rec.sourceType || "manuscript-derived";
+  rec.hasCustomEdits = true;
+  rec.lastEditedAt = new Date().toISOString();
+  rec.lastEditedBy = cloud.user?.uid || "local";
   $("desc-editor").close();
   editingTarget = null;
   defaultShown = false;
@@ -1300,7 +1407,7 @@ function searchTaxonomy(term) {
     row.forEach((cell, c) => {
       if (cell.text.trim() === "") return;
       if (cellHaystack(cell).includes(t)) {
-        results.push({ type: "value", c, r, label: cell.text, context: `${taxonomy.columns[c].name} · Element ${r}`, snippet: cell.shortDescription });
+        results.push({ type: "value", c, r, label: cell.text, context: taxonomy.columns[c].name, snippet: cell.shortDescription });
       }
     });
   });
@@ -1604,10 +1711,18 @@ function buildAIContext(topic) {
     selections.push({
       column: col.name,
       columnDescription: col.shortDescription,
+      columnDetail: col.detailedDescription,
+      designQuestion: col.designQuestion,
+      whyItMatters: col.whyItMatters,
       elementNumber: r,
       value: cell.text,
       valueDescription: cell.shortDescription,
-      valueExample: cell.example
+      valueDetail: cell.detailedDescription,
+      participantRole: cell.participantRole,
+      designerResponsibility: cell.designerResponsibility,
+      cautions: cell.cautions,
+      valueExample: cell.example,
+      source: cell.source
     });
   });
   return { topic, selections };
@@ -1804,7 +1919,7 @@ function composeIdea(topic, profile) {
   const rationale = Object.values(sel).map(({ cell, col, row }) => ({
     col: col.name,
     colMeaning: col.shortDescription ? capitalize(asClause(col.shortDescription)) : "",
-    values: [`Element ${row}: ${cell.text}`],
+    values: [cell.text],
     note: cell.shortDescription ? cell.shortDescription.replace(/\.$/, "") : `a deliberate choice for ${col.name}`
   }));
 
@@ -1946,7 +2061,7 @@ async function generateIdea() {
 
   const sel = selectionByColumnId();
   const chips = Object.values(sel)
-    .map(({ cell, col, row }) => `<span class="chip">${escapeHTML(col.name)} · E${row} ${escapeHTML(cell.text)}</span>`)
+    .map(({ cell, col }) => `<span class="chip">${escapeHTML(col.name)} · ${escapeHTML(cell.text)}</span>`)
     .join("");
 
   $("idea-output").innerHTML = `
