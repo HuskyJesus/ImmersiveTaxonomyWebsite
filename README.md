@@ -1,127 +1,88 @@
 # IXD — Immersive Experience Design Taxonomy
 
-A guided design methodology for immersive experiences — a static site built with plain HTML, CSS, and JavaScript, with Firebase for accounts, cloud saving, and per-user experience libraries. All URLs are relative, so the site works on GitHub Pages or any custom domain.
+A landing page and flexible design workspace for the immersive experience design taxonomy — a static site built with plain HTML, CSS, and JavaScript, with Firebase for accounts, cloud saving, and per-user experience libraries. All internal paths are relative, so the site works on GitHub Pages, a custom domain, or a local preview without changes.
 
 **Live site:** https://immersiveexperiencedesign.org/
 
-Each **column** of the taxonomy is one *design decision* (Interactivity, Embodiment, Story, Tech, …) and each cell is one **value** within it. Both columns and values have descriptions — click a column heading or the i beside any value to read them, or use the search bar to find anything by name, description, or example.
+> Based on the immersive experience design taxonomy developed by JJ Ruscella in
+> *“Immersion: The New Art Form — A Handbook for the Immersive Experience Designer.”*
 
-## Access levels
+## How the site works
+
+### The landing page
+
+Visitors arrive on a brief introduction: what the taxonomy is (a **map of design possibilities** — not a checklist, not a score; Element 4 is never automatically "better" than Element 0), who it's for, the problem it solves, and how it works. **Start Designing** scrolls to the workspace; **About the Taxonomy** and the video section offer more depth. The full table never appears before the visitor chooses to design.
+
+### The design workspace
+
+One flexible workspace — not a wizard. Nothing is gated; everything is reachable in any order:
+
+- **Experience Focus** — a compact topic input with a helper sentence and concrete examples (cooking, the history of the Civil War, onboarding new nurses, …).
+- **Generation controls** — primary: **Generate Experience**; secondary: **Generate From Random Path**, **Regenerate**; supporting: **Randomize Unlocked Elements**, **Clear Selections**, **Clear Locks**.
+- **Search** — matches dimension names, element names, all descriptions, manuscript fields, and examples. Opening a result shows its description; a **Select This Element** button inside the dialog applies it — search alone never changes your profile.
+- **The taxonomy table** — the centerpiece. Ten dimensions as columns, Elements 0–4 as rows. Headers show the dimension name and a one-line subtitle; every element shows its number, name, a short meaning, an information control, and (when selected) a lock control.
+- **The generated result** — appears beneath the table as a design brief.
+
+### Selecting and locking
+
+- Clicking an element selects it for that dimension; selecting another element in the same dimension replaces it (one element per dimension). Selection is shown by color, border, weight, and a check marker.
+- **Locks live on the table**: the selected element of a dimension carries a small padlock. Locked dimensions keep their element through every randomization and show a distinct green treatment with a closed padlock. Deliberately selecting a different element in a locked dimension moves the selection and keeps the lock (the lock follows your explicit choice — the tooltip says so). Deselecting removes the dimension's lock. **Clear Locks** releases all of them.
+- The three per-element controls never interfere: click selects, the **i** informs, the padlock locks.
+
+### Randomization
+
+- **Randomize Unlocked Elements** — keeps the topic and every locked element, selects one random element in each unlocked dimension, and does *not* generate.
+- **Generate From Random Path** — same, then generates immediately. With no topic entered, the randomized selections are kept and the workspace asks for a topic instead of inventing vague copy. Random profiles are framed as starting points to revise, never as finished designs.
+- **Generate Experience** with unselected dimensions offers a choice: randomize the missing ones, or generate from only your selected dimensions. There is no completion gate.
+
+### The generated design brief
+
+Sections: Experience Title, One-Sentence Concept, Intended Audience, Participant Roles, Setting, Purpose, Beginning / Middle / End, Core Interactions, Social Structure, Story Structure, Consequences & Agency, Gamification, Technology, Learning & Didactic Intent, Data Use, Facilitator & Secondary Perspective, Taxonomy Rationale, and Design Risks & Open Questions. Content is grounded in concrete actors, and each section honors the selected elements semantically — Passive requires no meaningful choices, No Story adds no narrative arc, Ungamified adds no points, None under Immersive Technology assumes no AR/VR, Anonymous depends on no identity tracking.
+
+The generator can run through an optional AI provider ([`ai-provider.js`](ai-provider.js), configured in [`ai-config.js`](ai-config.js) — read its security warning); without one it uses the built-in local generator. Either way the output shape is identical.
+
+## The taxonomy structure
+
+Ten dimensions, each with Elements 0–4 (row position = element number):
+
+Interactivity · Embodiment · Co-Participation · Story · Dynamics · Gamification · Immersive Technology · Meta-Control · Didactic Capacity · Data
+
+Every dimension and element has a stable internal ID plus editable descriptions: short, detailed, and example, plus manuscript fields (dimensions: chapter subtitle, central design question, why it matters, Element 0→4 progression, source chapter; elements: participant role, designer responsibility, use cases, cautions, source chapter and section). Manuscript fields render in the info dialogs only when filled. **The description text currently in [`starter-content.js`](starter-content.js) is editable placeholder wording written for this site; the manuscript fields ship empty and should be filled from the manuscript** — via Edit Taxonomy on the site or in that file.
+
+## Authentication roles
 
 | | Public visitor | Signed-in user | Administrator |
 |---|---|---|---|
-| Explore, read descriptions, search | ✓ | ✓ | ✓ |
-| Select cells, randomize, generate | ✓ | ✓ | ✓ |
+| Explore, read descriptions, search, select, lock, randomize, generate | ✓ | ✓ | ✓ |
 | Save experiences to a personal library | | ✓ | ✓ |
 | Edit the taxonomy + descriptions | | | ✓ |
 
-Administrators are fixed by a UID allowlist in [`firestore.rules`](firestore.rules) — creating an account never grants edit access, and nothing a user can write is consulted for authorization, so self-promotion is impossible.
+Administrators are exactly the two UIDs allowlisted in [`firestore.rules`](firestore.rules) — creating an account never grants edit access, and the rules are the authority. An unsaved generated result survives signing in.
 
-## Using the site
+### Saved experiences
 
-### Accounts (header, upper right)
-
-- **Sign Up** — display name, email, password (+ confirmation). Registration signs you in automatically and creates your profile.
-- **Sign In / Forgot password?** — standard email/password sign-in with password-reset emails.
-- Signed in, your name appears in the header with a menu: **Saved Experiences** and **Sign Out**.
-
-### The guided workflow (everyone)
-
-The homepage walks visitors through one linear process:
-
-1. **Choose your topic** — any subject.
-2. **Shape your experience** — pick one value per column (choosing a second value in the same column replaces the first). The **i** beside a value explains it without selecting it; hover tooltips give a one-line preview. **Complete My Selections Randomly** keeps your decisions and fills the rest.
-3. **Generate** — the button appears only once a topic exists and at least three dimensions are decided; a status line explains what's missing.
-4. **Review and save** — the concept renders as a structured report (pitch, section cards, design rationale, expansion). Actions: **Save Experience**, **Generate New Variation**, **Start Over**.
-
-The generator reads the *descriptions* of the chosen values and their categories — the same editable text in the info dialogs — so ideas are interpreted, not concatenated. See "AI generation" below for the optional AI provider; without one, everything runs locally in the browser.
-
-### Saved Experiences
-
-Search, sort (newest/oldest/title/favorites), and filter your saved experiences. Opening one shows the full concept, its taxonomy selections, notes, and dates. You can rename it, edit notes, favorite it, duplicate it, delete it, **load its selections back into the generator**, or **regenerate a fresh variation from the same recipe** (saving that creates a separate entry).
+Signed-in users save generated briefs to their private library: search, sort, favorite, rename, edit notes, duplicate, delete, **Load Into Workspace** (selections map back by stable ID), and **Regenerate Variation**. Experiences saved by earlier versions of the site still render.
 
 ### Edit Taxonomy (administrators)
 
-Admins get an **Edit Taxonomy** button in the header that switches the grid into editing:
+The header's **Edit Taxonomy** button switches the table into editing: inline name edits, per-element and per-dimension description editors (including all manuscript fields) with Save/Cancel, a **Compare / Restore Default** button inside the editor, add/delete dimensions and element rows (with confirmation), **Restore Manuscript Defaults**, cloud autosave with visible status, **Save Now**, and JSON backup tools. Edit controls never appear in the normal workspace.
 
-- Edit any cell's text inline; the **✎** inside a cell edits that value's descriptions; **✎** beside a column name edits the category. Save/Cancel with a discard warning.
-- Columns **and values** have stable internal IDs — renaming never loses descriptions or breaks saved experiences.
-- Add/delete rows and columns (deletions confirm first, since descriptions go with them). New columns and rows get blank description records automatically.
-- Changes autosave to the cloud (~1.2 s debounce) with visible status, Save Now, Retry, and Last-saved time. **Backup Tools** holds JSON export/import (validated, confirmed) and Restore Last Cloud Version.
+## Testing locally and in the cloud
 
-All starter descriptions — for the 10 categories and all 50 values — are **editable placeholder content** in [`starter-content.js`](starter-content.js), not final academic definitions.
-
-## Firestore schema
-
-```
-taxonomy/current                        ← the published taxonomy (public read, admin write)
-{
-  schemaVersion: 3,
-  columns: [{
-    id, name,                           ← id is stable across renames
-    shortDescription, detailedDescription, example,
-    values: [{                          ← this column's cells, top to bottom
-      id, text,                         ← id is stable across renames
-      shortDescription, detailedDescription, example
-    }]
-  }],
-  rowCount, updatedAt, updatedBy
-}
-
-users/{uid}                             ← owner-only
-{ displayName, email, createdAt, lastLoginAt }   ← never passwords, never roles
-
-users/{uid}/savedExperiences/{id}       ← owner-only
-{
-  schemaVersion: 1,
-  title, topic, kind ("full"|"spark"), notes, favorite,
-  selections: [{ columnId, columnName, valueId, valueText }],
-  content: { pitch, audience, flow, interaction, immersion,
-             goal, dataUse, techFit, rationale[], expansion },   ← structured text, no HTML
-  createdAt, updatedAt
-}
-```
-
-Older data migrates automatically on load: v1/v2 localStorage, v2 cloud documents, and old JSON exports are upgraded to schema 3 — existing IDs are kept, known default values receive starter descriptions, and custom text is never overwritten.
-
-## Security rules summary
-
-[`firestore.rules`](firestore.rules):
-
-- `isAdmin()` — the single admin UID allowlist (currently Father + site maintainer). Edit the list, publish, done.
-- `taxonomy/*` — public read; write only via `isAdmin()`.
-- `users/{uid}` and `users/{uid}/savedExperiences/*` — full access only for that user (`request.auth.uid == uid`).
-- Everything else — denied.
-
-## Firebase setup
-
-Already done for this project (config in [`firebase-config.js`](firebase-config.js)). For a fresh deployment: create a Firebase project, enable **Firestore** and **Email/Password authentication**, paste [`firestore.rules`](firestore.rules) into Firestore → Rules (updating the admin UIDs), and paste the web-app config values into `firebase-config.js`. Push to `main` — GitHub Pages redeploys automatically.
-
-**After every change to `firestore.rules` in this repository, the rules must be re-published in the Firebase Console** (Firestore Database → Rules) — deployments only serve the website, not the rules.
-
-When using a custom domain, add it under **Firebase Console → Authentication → Settings → Authorized domains** so sign-in works there.
-
-## AI generation (optional)
-
-The generator can use an AI provider instead of the built-in local generator. The provider layer ([`ai-provider.js`](ai-provider.js)) is an abstraction: providers implement `isConfigured()` and `generate(context)` and return the same idea shape the local generator produces, so the rest of the app never knows which one ran. OpenAI is implemented; Claude, Gemini, or a local Ollama can be added as new entries.
-
-Configure in [`ai-config.js`](ai-config.js). If no provider is configured — or a request fails — the site falls back to the local generator automatically. **Read the security warning in that file before adding an API key**: keys in a static site are visible to visitors; for production, route through a small proxy and point `baseUrl` at it.
-
-## The walkthrough video
-
-The homepage has a video section with a placeholder. To show your video, set `INTRO_VIDEO_EMBED_URL` near the top of [`script.js`](script.js) to a YouTube or Loom *embed* URL (e.g. `https://www.youtube-nocookie.com/embed/VIDEOID` or `https://www.loom.com/embed/VIDEOID`).
+- **Local:** serve the folder with any static server (e.g. `python3 -m http.server`) and open it. With `firebase-config.js` placeholders the site runs in local-only mode (edits stay in the browser). With the real config it loads the published cloud taxonomy; sign in to test accounts and saving.
+- **Cloud:** the published taxonomy lives in Firestore at `taxonomy/current` (public read, admin write). After changing `firestore.rules`, re-publish them in the Firebase Console — deployments only serve the website. When adding a domain, list it under Authentication → Settings → Authorized domains.
 
 ## Project structure
 
 | File | Purpose |
 |---|---|
-| `index.html` | Page structure + dialogs (info viewer, editor, auth, library) |
+| `index.html` | Landing, about, workspace, book section, dialogs |
 | `styles.css` | All styling — theme variables at the top |
-| `script.js` | All logic — workflow, data model, cloud sync, auth, library, local generator |
-| `starter-content.js` | Default taxonomy + all editable starter descriptions |
+| `script.js` | All logic — workspace, locks, generator, cloud sync, auth, library |
+| `starter-content.js` | Default taxonomy + editable starter descriptions |
 | `ai-provider.js` | AI provider abstraction (OpenAI implemented, local fallback) |
 | `ai-config.js` | AI provider configuration |
 | `firebase-config.js` | Firebase web config |
 | `firestore.rules` | Security rules (publish these in the Firebase Console) |
 
-Version 4.0
+Version 5.0

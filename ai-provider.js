@@ -14,15 +14,18 @@
      selections: [{
        column: string,            // dimension name
        columnDescription: string, // what the dimension controls
-       value: string,             // the chosen value
-       valueDescription: string,  // what the value means
+       elementNumber: number,     // 0–4 within the dimension
+       value: string,             // the chosen element
+       valueDescription: string,  // what the element means
        valueExample: string
      }]
    }
 
    idea = {
-     title, pitch, audience, flow, interaction, immersion,
-     goal, dataUse, techFit, expansion: string,
+     title, concept, audience, roles, setting, purpose,
+     beginning, middle, end,
+     interactions, social, story, agency, gamification,
+     technology, didactic, dataUse, facilitator, risks: string,
      rationale: [{ col, colMeaning, values: [string], note }]
    }
 
@@ -44,47 +47,65 @@ function buildPrompt(context) {
     .map(
       (s) =>
         `- ${s.column} (${s.columnDescription || "a design dimension"}): ` +
-        `"${s.value}" — ${s.valueDescription || "no description"}` +
-        (s.valueExample ? ` (example of this value in use: ${s.valueExample})` : "")
+        `Element ${s.elementNumber ?? "?"} "${s.value}" — ${s.valueDescription || "no description"}` +
+        (s.valueExample ? ` (example of this element in use: ${s.valueExample})` : "")
     )
     .join("\n");
 
   const system =
-    "You are an expert immersive experience designer. You turn a topic plus a set of " +
-    "design decisions into a concrete, vivid experience concept. You write like a designer " +
-    "presenting to a client: specific, grounded, and human. NEVER write abstract statements " +
-    'like "the participant solves puzzles" — instead write concrete user stories like ' +
-    '"a middle-school student explores an abandoned research station while guided by an AI ' +
-    'historian; each room presents a historical mystery that must be solved before progressing." ' +
-    "Every concept must establish WHO the participant is, WHERE the experience happens, WHY " +
-    "they are there, WHAT they actually do, and must have a clear beginning, middle, and end.";
+    "You are an expert immersive experience designer working with JJ Ruscella's immersive " +
+    "experience design taxonomy. You turn a topic plus a set of design decisions into a " +
+    "concrete, vivid experience concept written like a professional design brief. NEVER write " +
+    'abstract statements like "the participant solves puzzles" — instead write concrete user ' +
+    'stories like "two high-school students take the roles of archival investigators; a museum ' +
+    'educator guides them as they compare conflicting Civil War letters and decide how to ' +
+    'present the accounts in a public exhibit." Every concept must establish WHO the ' +
+    "participants are, WHERE the experience happens, WHY they are there, WHAT they actually " +
+    "do, with a clear beginning, middle, and end. CRITICAL: honor each selected element's " +
+    "meaning exactly — a Passive selection must not require meaningful choices, Single Player " +
+    "must not require a team, No Story must not add a narrative arc, Pre-Determined must not " +
+    "offer branching outcomes, Ungamified must not add points or achievements, None under " +
+    "Immersive Technology must not assume AR or VR, Anonymous must not depend on identity " +
+    "tracking. The elements are possibilities, not rankings — never imply higher-numbered " +
+    "elements are better.";
 
   const user =
 `TOPIC: ${context.topic}
 
-DESIGN DECISIONS (each is one dimension of the taxonomy and the chosen value, with its meaning):
+DESIGN DECISIONS (one element chosen per dimension, with its meaning — honor each exactly):
 ${decisions}
 
-Write one immersive experience concept honoring every decision above. Respond with ONLY a JSON object, no markdown fences, with exactly these string fields:
+Write one immersive experience concept as a design brief. Respond with ONLY a JSON object, no markdown fences, with exactly these string fields:
 - "title": an evocative name for the experience
-- "pitch": 1-2 sentences that make someone want to build it — concrete, not abstract
-- "audience": who the participant is (a specific kind of person) and the role they play
-- "flow": the participant's journey as a story — beginning (arrival, who/where/why), middle (what they actually do, moment to moment), end (how it resolves and what they leave with)
-- "interaction": what participants concretely DO, honoring the Interactivity/Dynamics/Motivation decisions
-- "immersion": how presence is created, honoring the Embodiment/Meta Control decisions
-- "goal": the learning and emotional outcome, honoring the Learning decision
-- "dataUse": what the experience knows about participants and how it uses it, honoring the Data decision
-- "techFit": how the chosen technology serves the experience, honoring the Tech decision
-- "expansion": one optional way to extend or scale the experience
+- "concept": one sentence that establishes who, where, and why — concrete, not abstract
+- "audience": who this is designed for
+- "roles": the concrete roles participants (and any facilitators) play
+- "setting": where the experience happens and what makes the place feel real
+- "purpose": what the experience is for
+- "beginning": how participants arrive and why they are there
+- "middle": what they actually do, moment to moment
+- "end": how it resolves and what they leave with
+- "interactions": the core things participants do (honor Interactivity and Gamification)
+- "social": the social structure (honor Co-Participation)
+- "story": the narrative structure (honor Story)
+- "agency": consequences and agency (honor Dynamics and Meta-Control)
+- "gamification": game structures used or deliberately absent (honor Gamification)
+- "technology": the delivery platform and why it fits (honor Immersive Technology)
+- "didactic": the learning intent and how knowledge arrives (honor Didactic Capacity)
+- "dataUse": what the experience knows about participants (honor Data)
+- "facilitator": the facilitator or secondary-perspective layer, if any
+- "risks": 1-2 design risks or open questions the designer should resolve
 and one array field:
-- "rationale": one entry per design decision, each an object {"col": dimension name, "colMeaning": what the dimension controls, "values": [chosen value], "note": one sentence on how this concept honors that choice}`;
+- "rationale": one entry per design decision, each an object {"col": dimension name, "colMeaning": what the dimension controls, "values": ["Element N: chosen element"], "note": one sentence on how this concept honors that choice}`;
 
   return { system, user };
 }
 
 /* Validates that a provider response has the shape the app needs */
 function isValidIdea(idea) {
-  const strings = ["title", "pitch", "audience", "flow", "interaction", "immersion", "goal", "dataUse", "techFit", "expansion"];
+  const strings = ["title", "concept", "audience", "roles", "setting", "purpose",
+    "beginning", "middle", "end", "interactions", "social", "story", "agency",
+    "gamification", "technology", "didactic", "dataUse", "facilitator", "risks"];
   return (
     idea &&
     strings.every((k) => typeof idea[k] === "string" && idea[k].length > 0) &&

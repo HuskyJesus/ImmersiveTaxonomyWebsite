@@ -2,22 +2,54 @@
    STARTER CONTENT — default taxonomy with editable descriptions
    ============================================================
 
-   Everything in this file is EDITABLE STARTER CONTENT: clear,
-   professional placeholder text, not final academic definitions.
-   Administrators can rewrite any of it directly on the site
-   (Edit Mode → ✎ beside a column name or inside a cell), or you
-   can edit this file to change what "Reset to Default" restores
-   and what brand-new visitors see before anything is published.
+   The taxonomy is based on the immersive experience design
+   taxonomy developed by JJ Ruscella in "Immersion: The New Art
+   Form — A Handbook for the Immersive Experience Designer."
+
+   Dimension and element NAMES below follow the manuscript's
+   structure (ten dimensions, Elements 0–4 in each). The
+   description text is EDITABLE STARTER CONTENT written for this
+   site: clear, professional placeholders — not quotations from
+   the manuscript. Fields that should hold manuscript-derived
+   content (design question, participant role, cautions, source
+   chapter, …) are present in the data model but intentionally
+   left EMPTY until they are filled from the manuscript itself —
+   nothing here is invented on the manuscript's behalf.
+   Administrators can fill any field directly on the site
+   (Edit Taxonomy → the pencil control on a column or element).
 
    Structure:
      DEFAULT_COLUMNS  — the ten design dimensions + descriptions
-     DEFAULT_ROWS     — the grid of value names (spelling preserved
-                        exactly as provided, e.g. "Sythensis")
-     VALUE_STARTERS   — per-value descriptions, keyed by column id
-                        then value text
+     DEFAULT_ROWS     — the grid of element names, one row per
+                        element level (row index = element number,
+                        Element 0 at the top)
+     VALUE_STARTERS   — per-element descriptions, keyed by column
+                        id then element text
      buildDefaultTaxonomy() — assembles the schema-v3 object with
                         stable ids on every column AND every value
+
+   NOTE ON IDS: column ids ("motivation", "tech", "learning",
+   "meta-control") predate the current display names and are kept
+   deliberately — stable ids must never change, only names do.
    ============================================================ */
+
+/* Empty manuscript-content fields shared by every column */
+const COLUMN_MANUSCRIPT_FIELDS = {
+  subtitle: "",          // chapter framing subtitle
+  designQuestion: "",    // the central design question this dimension asks
+  whyItMatters: "",      // why this decision matters
+  progression: "",       // how Element 0 → Element 4 progresses
+  source: ""             // source chapter in the manuscript
+};
+
+/* Empty manuscript-content fields shared by every element */
+const VALUE_MANUSCRIPT_FIELDS = {
+  participantRole: "",         // what the participant is/does at this level
+  designerResponsibility: "",  // what the designer must provide
+  useCases: "",                // appropriate use cases
+  cautions: "",                // cautions and misuse risks
+  source: ""                   // source chapter and section
+};
 
 export const DEFAULT_COLUMNS = [
   {
@@ -25,90 +57,104 @@ export const DEFAULT_COLUMNS = [
     name: "Interactivity",
     shortDescription: "How much, and in what way, participants can act within the experience.",
     detailedDescription: "Interactivity ranges from purely watching to solving problems, moving physically, or engaging other people. It sets the baseline for what a participant is invited — or required — to do, and every other design choice tends to build on it.",
-    example: "A museum exhibit is Passive when visitors only view it; it becomes Problem Solving when visitors must decode a cipher to open the next room."
+    example: "A museum exhibit is Passive when visitors only view it; it becomes Problem Solving when visitors must decode a cipher to open the next room.",
+    ...COLUMN_MANUSCRIPT_FIELDS
   },
   {
     id: "embodiment",
     name: "Embodiment",
     shortDescription: "How present participants feel inside the experience — where their body and point of view sit.",
     detailedDescription: "Embodiment describes the participant's relationship to the world: watching it from outside, standing invisibly within it, seeing through their own eyes, having their movement mirrored, or being met by real humans. Stronger embodiment usually means stronger immersion — and higher design stakes.",
-    example: "The same battlefield scene feels documentary-like from a Detached view, and overwhelming in First Person POV as musket fire passes overhead."
+    example: "The same battlefield scene feels documentary-like from a Detached view, and overwhelming in First Person POV as musket fire passes overhead.",
+    ...COLUMN_MANUSCRIPT_FIELDS
   },
   {
     id: "co-participation",
     name: "Co-Participation",
     shortDescription: "The social structure — how many people share the experience and how they relate.",
     detailedDescription: "Co-Participation covers everything from a solo session to intimate one-on-one encounters, small groups, massive shared worlds, and asymmetric setups where some people act while others watch and influence. It determines whether meaning comes from private reflection or shared negotiation.",
-    example: "An escape room is a Group experience; the same puzzles reworked as a play-by-post with an audience voting on hints becomes Secondary Perspective."
+    example: "An escape room is a Group experience; the same puzzles reworked as a play-by-post with an audience voting on hints becomes Secondary Perspective.",
+    ...COLUMN_MANUSCRIPT_FIELDS
   },
   {
     id: "story",
     name: "Story",
     shortDescription: "How narrative is structured — from none at all to a story that adapts around the participant.",
     detailedDescription: "Story sets the narrative spine: an experience can rely on pure activity with no plot, imply a story through its setting, deliver a fixed authored narrative, branch on participant choices, or continuously reshape itself. More narrative flexibility generally trades authorial control for participant ownership.",
-    example: "A cooking class has no story; a themed dinner where each course reveals a chapter of a chef's journey uses a Pre-created narrative."
+    example: "A cooking class has no story; a themed dinner where each course reveals a chapter of a chef's journey uses a Pre-created narrative.",
+    ...COLUMN_MANUSCRIPT_FIELDS
   },
   {
     id: "dynamics",
     name: "Dynamics",
     shortDescription: "How much agency participants have and how the system responds to what they do.",
     detailedDescription: "Dynamics describes the rules of cause and effect: events may run on rails, pause at decision points, respond to free action, negotiate through open dialogue, or let participants shift their point of view on the system itself. It is the dimension participants feel most directly, moment to moment.",
-    example: "A haunted house is Predetermined — everyone gets the same scares. An improv-driven version where actors build on whatever guests do runs on Free Will."
+    example: "A haunted house is Pre-Determined — everyone gets the same scares. An improv-driven version where actors build on whatever guests do runs on Free Will.",
+    ...COLUMN_MANUSCRIPT_FIELDS
   },
   {
-    id: "motivation",
-    name: "Motivation",
-    shortDescription: "Why participants keep going — the engagement engine of the experience.",
-    detailedDescription: "Motivation covers the incentives that sustain attention: pure curiosity, inherently satisfying mechanics, difficulty and mastery, steady reinforcement, or explicit reward systems. Matching the motivation style to the audience is often the difference between an experience people finish and one they abandon.",
-    example: "A language-learning quest can rely on Challenge (beat the conversation boss) or a Reward System (streaks, badges, and unlockable dialects)."
+    id: "motivation",   // stable id kept from the earlier "Motivation" name
+    name: "Gamification",
+    shortDescription: "Whether and how game structures — goals, feedback, rewards — drive engagement.",
+    detailedDescription: "Gamification covers the spectrum from experiences with no game structures at all, through inherently satisfying mechanics, difficulty and mastery, steady reinforcement, and explicit reward systems. Matching the level of gamification to the audience and purpose is often the difference between an experience people finish and one they abandon.",
+    example: "A language-learning quest can rely on Challenge (beat the conversation boss) or a Reward System (streaks, badges, and unlockable dialects).",
+    ...COLUMN_MANUSCRIPT_FIELDS
+  },
+  {
+    id: "tech",         // stable id kept from the earlier "Tech" name
+    name: "Immersive Technology",
+    shortDescription: "The delivery platform — from no technology at all to fully mixed physical-digital systems.",
+    detailedDescription: "Immersive Technology sets the platform assumptions: analog and physical, flat screens, augmented overlays on the real world, fully simulated virtual spaces, or mixed systems that span physical and digital. Technology amplifies immersion but does not create it by itself — the strongest designs choose the lightest technology that still delivers the intended presence.",
+    example: "A city history walk works on 2D (a map app), in AR (ghost buildings overlaid on real streets), or with no technology at all (props, actors, and good writing).",
+    ...COLUMN_MANUSCRIPT_FIELDS
   },
   {
     id: "meta-control",
-    name: "Meta Control",
+    name: "Meta-Control",
     shortDescription: "Whether participants can shape the world and its rules, not just act inside them.",
-    detailedDescription: "Meta Control ranges from playing the world exactly as given, to steering your own journey, defining your character, editing parts of the world, or building the world itself. High meta control turns participants into co-designers — powerful for ownership, demanding for the design.",
-    example: "In a historical simulation, students who can redraw supply lines and re-run the campaign are using World Editor control rather than following a fixed scenario."
+    detailedDescription: "Meta-Control ranges from watching the world exactly as given, to steering your own journey, defining your character, editing parts of the world, or building the world itself. High meta-control turns participants into co-designers — powerful for ownership, demanding for the design.",
+    example: "In a historical simulation, students who can redraw supply lines and re-run the campaign are using World Editor control rather than following a fixed scenario.",
+    ...COLUMN_MANUSCRIPT_FIELDS
   },
   {
-    id: "learning",
-    name: "Learning",
+    id: "learning",     // stable id kept from the earlier "Learning" name
+    name: "Didactic Capacity",
     shortDescription: "How knowledge is delivered and absorbed within the experience.",
-    detailedDescription: "Learning may arrive as small foundational pieces, direct explicit instruction, implicit absorption through doing, structured recall of prior knowledge, or synthesis where participants combine ideas into something new. Immersive design shines when the learning style is woven into the activity instead of bolted on.",
-    example: "A chemistry escape room teaches Implicitly — players internalize reaction rules because the door will not open otherwise."
+    detailedDescription: "Didactic Capacity describes how an experience teaches: knowledge may arrive as small foundational pieces, direct explicit instruction, implicit absorption through doing, structured recall of prior knowledge, or synthesis where participants combine ideas into something new. Immersive design shines when the learning style is woven into the activity instead of bolted on.",
+    example: "A chemistry escape room teaches Implicitly — players internalize reaction rules because the door will not open otherwise.",
+    ...COLUMN_MANUSCRIPT_FIELDS
   },
   {
     id: "data",
     name: "Data",
     shortDescription: "What the experience knows about participants — personalization and tracking.",
     detailedDescription: "Data ranges from fully anonymous sessions, to knowing names and identities, tracking behavior within a session, maintaining persistent personal profiles, or responding to live biometric signals. More data enables deeper personalization and raises the bar for trust and transparency.",
-    example: "A meditation space that softens its soundscape when a wearable reports rising heart rate is using Biometric data."
-  },
-  {
-    id: "tech",
-    name: "Tech",
-    shortDescription: "The delivery platform — from no technology at all to fully mixed physical-digital systems.",
-    detailedDescription: "Tech sets the platform assumptions: analog and physical, flat screens, augmented overlays on the real world, fully simulated virtual spaces, or mixed systems that span physical and digital. The strongest designs choose the lightest technology that still delivers the intended presence.",
-    example: "A city history walk works on 2D (a map app), in AR (ghost buildings overlaid on real streets), or with no tech at all (props, actors, and good writing)."
+    example: "A meditation space that softens its soundscape when a wearable reports rising heart rate is using Biometric data.",
+    ...COLUMN_MANUSCRIPT_FIELDS
   }
 ];
 
-/* The grid of value names — spelling preserved exactly */
+/* The grid of element names — row index = element number
+   (Element 0 at the top, Element 4 at the bottom).
+   Column order matches DEFAULT_COLUMNS above. */
 export const DEFAULT_ROWS = [
-  ["Passive", "Detached", "Single Person", "None", "Predetermined", "None", "None", "Elemental", "Anonymous", "none"],
-  ["Interactive", "Observer", "One on One", "Setting", "Choice", "Basic Mechanics", "Journey", "Explicit", "Identity", "2D"],
-  ["Problem Solving", "First Person POV", "Group", "Pre-created", "Free Will", "Challenge", "Character", "Implicit", "In-session", "AR"],
-  ["Physicalized", "Movement Control", "MMO", "Choose your own", "Conversational Reality", "Reinforcement", "World Editor", "Recall", "Personalized", "VR"],
-  ["Interpersonal", "Human to Human", "Secondary Perspective", "Adaptive Story", "Adjustible POV", "Reward System", "World Builder", "Sythensis", "Biometric", "XR"]
+  ["Passive", "Detached", "Single Player", "No Story", "Pre-Determined", "Ungamified", "None", "The Passive Watcher", "Elemental", "Anonymous"],
+  ["Interactive", "Observer", "One on One", "Setting", "Choice", "Basic Mechanics", "2D", "Journey", "Explicit", "Identity"],
+  ["Problem Solving", "First Person POV", "Group", "Pre-created", "Free Will", "Challenge", "AR", "Character", "Implicit", "In-session"],
+  ["Physicalized", "Movement Control", "MMO", "Choose your own", "Conversational Reality", "Reinforcement", "VR", "World Editor", "Recall", "Personalized"],
+  ["Interpersonal", "Human to Human", "Secondary Perspective", "Adaptive Story", "Adjustible POV", "Reward System", "XR", "World Builder", "Sythensis", "Biometric"]
 ];
 
-/* Per-value starter descriptions, keyed by column id → value text.
-   short = one-sentence definition · detailed = fuller explanation
-   · example = an immersive-design example */
+/* Per-element starter descriptions, keyed by column id → element
+   text. short = one-sentence definition · detailed = fuller
+   explanation · example = an immersive-design example.
+   Manuscript-specific fields (participant role, cautions, source
+   chapter, …) are added empty by buildDefaultTaxonomy(). */
 export const VALUE_STARTERS = {
   "interactivity": {
     "Passive": {
       short: "Participants primarily observe as the experience unfolds around them.",
-      detailed: "Passive interactivity puts the participant in the audience seat: the experience runs regardless of what they do. This gives the designer complete control of pacing, framing, and emotional beats, at the cost of participant agency.",
+      detailed: "Passive interactivity puts the participant in the audience seat: the experience runs regardless of what they do, and no meaningful choices are required of them. This gives the designer complete control of pacing, framing, and emotional beats, at the cost of participant agency.",
       example: "A planetarium show — visitors recline and watch a fully authored journey through the night sky."
     },
     "Interactive": {
@@ -160,9 +206,9 @@ export const VALUE_STARTERS = {
     }
   },
   "co-participation": {
-    "Single Person": {
+    "Single Player": {
       short: "A solo experience tuned for individual focus and pacing.",
-      detailed: "Single-person design gives one participant the entire experience: private pacing, personal stakes, and no social pressure. It suits reflection, confession, and mastery — and it must carry all engagement without social energy.",
+      detailed: "Single-player design gives one participant the entire experience: private pacing, personal stakes, and no social pressure — and no team is required or assumed. It suits reflection, confession, and mastery, and it must carry all engagement without social energy.",
       example: "A one-person audio walk where the narrator seems to know which bench you just sat on."
     },
     "One on One": {
@@ -187,9 +233,9 @@ export const VALUE_STARTERS = {
     }
   },
   "story": {
-    "None": {
+    "No Story": {
       short: "No imposed narrative — meaning emerges from what participants do.",
-      detailed: "Story-free design trusts the activity itself: sandbox play, open exploration, or pure challenge. Participants author their own meaning, and the designer's craft moves into systems and spaces rather than plot.",
+      detailed: "Story-free design trusts the activity itself: sandbox play, open exploration, or pure challenge — no narrative arc is added or implied. Participants author their own meaning, and the designer's craft moves into systems and spaces rather than plot.",
       example: "A materials playground where visitors combine gears, ramps, and marbles with no goal beyond what they invent."
     },
     "Setting": {
@@ -214,9 +260,9 @@ export const VALUE_STARTERS = {
     }
   },
   "dynamics": {
-    "Predetermined": {
+    "Pre-Determined": {
       short: "Events run on rails, giving the designer full control of pacing and reveals.",
-      detailed: "Predetermined dynamics fix the sequence of events regardless of participant action. Every moment can be composed like film — lighting, timing, music — which makes it the most reliable way to deliver a precise emotional arc.",
+      detailed: "Pre-determined dynamics fix the sequence of events regardless of participant action — there are no branching outcomes. Every moment can be composed like film, which makes it the most reliable way to deliver a precise emotional arc.",
       example: "A dark ride through a volcano's eruption timeline: every tremor and reveal hits at the same rehearsed second."
     },
     "Choice": {
@@ -241,19 +287,19 @@ export const VALUE_STARTERS = {
     }
   },
   "motivation": {
-    "None": {
-      short: "Engagement rides on curiosity alone — no external incentives.",
-      detailed: "Incentive-free design trusts intrinsic interest: the subject, the space, and the activity must be their own reward. It filters for genuine engagement and imposes the highest standard on content quality.",
+    "Ungamified": {
+      short: "No game structures at all — no points, scores, badges, or achievements.",
+      detailed: "An ungamified experience relies entirely on intrinsic interest: the subject, the space, and the activity must be their own reward. It filters for genuine engagement and imposes the highest standard on content quality.",
       example: "An unmarked door in a library that simply opens into a perfect recreation of Darwin's study — stay as long as you like."
     },
     "Basic Mechanics": {
       short: "Simple, satisfying mechanics keep hands and minds engaged.",
-      detailed: "Mechanics-driven motivation uses inherently pleasant loops — collecting, matching, stacking, popping — to sustain attention. The loop carries participants through content they might not otherwise sit still for.",
+      detailed: "Mechanics-driven engagement uses inherently pleasant loops — collecting, matching, stacking, popping — to sustain attention. The loop carries participants through content they might not otherwise sit still for.",
       example: "A recycling exhibit where sorting waste into the right chutes is made as tactile and satisfying as an arcade game."
     },
     "Challenge": {
       short: "Difficulty itself is the draw, so mastery feels earned.",
-      detailed: "Challenge-based motivation sets a bar participants must genuinely reach — and the possibility of failure is what makes success mean something. Tuning difficulty to the audience is the whole game.",
+      detailed: "Challenge-based engagement sets a bar participants must genuinely reach — and the possibility of failure is what makes success mean something. Tuning difficulty to the audience is the whole game.",
       example: "A code-breaking room with a posted 22% success rate; teams line up specifically because most fail."
     },
     "Reinforcement": {
@@ -267,10 +313,37 @@ export const VALUE_STARTERS = {
       example: "A museum passport program where stamps from twelve challenge stations unlock an after-hours vault tour."
     }
   },
-  "meta-control": {
+  "tech": {
     "None": {
-      short: "Participants play within the world exactly as designed.",
-      detailed: "With no meta control, the world's rules and shape are fixed; participants act inside them but never on them. This keeps every session coherent and comparable — the designer's vision arrives intact.",
+      short: "No technology at all — a fully physical, analog experience.",
+      detailed: "Technology-free design relies on space, objects, print, and people — no AR, VR, or screens are assumed anywhere. Nothing can crash, nothing needs charging, and nothing stands between participants and the material; every effect must be achieved physically.",
+      example: "A 1940s radio-drama evening staged entirely with practical props, live foley, and actors — not one screen in the building."
+    },
+    "2D": {
+      short: "A screen-based experience on ordinary displays.",
+      detailed: "2D delivery uses the screens everyone already has — phones, laptops, projectors. It is the most accessible and distributable platform, trading physical presence for reach, and it rewards strong interface craft.",
+      example: "A browser-based archive dive where dragging documents around a virtual desk slowly assembles a family's immigration story."
+    },
+    "AR": {
+      short: "Digital content overlaid onto the real world.",
+      detailed: "Augmented reality annotates reality: the participant's actual surroundings remain primary, with digital layers adding what is invisible — the past, the hidden, the explanatory. Strongest where place itself matters.",
+      example: "A battlefield walk where raising your phone shows the troop lines advancing across the very field you are standing on."
+    },
+    "VR": {
+      short: "A fully immersive simulated space.",
+      detailed: "Virtual reality replaces the participant's entire sensory world, enabling the impossible: other scales, other centuries, other bodies. Total control of the environment comes with hardware friction and per-person throughput limits.",
+      example: "A cell-biology voyage where students shrink to protein scale and physically duck under a passing ribosome."
+    },
+    "XR": {
+      short: "A mixed system spanning physical and digital space.",
+      detailed: "Extended reality blends physical sets, tracked objects, and digital layers into one continuous world — real props you can touch, virtual events you can only see. The richest presence available, and the most complex to orchestrate.",
+      example: "A haunted manor where the physical door you push creaks open onto a virtual ballroom, and the cold you feel is a real fan."
+    }
+  },
+  "meta-control": {
+    "The Passive Watcher": {
+      short: "Participants experience the world exactly as designed — they shape nothing about it.",
+      detailed: "The passive watcher acts within the world but never on it: the rules, spaces, and story remain entirely in the designer's hands, and no world-editing of any kind is available. This keeps every session coherent and comparable — the designer's vision arrives intact.",
       example: "A tightly staged submarine drama where the crew stations, the fault, and the fate of the boat are the same every night."
     },
     "Journey": {
@@ -324,7 +397,7 @@ export const VALUE_STARTERS = {
   "data": {
     "Anonymous": {
       short: "No participant data is kept — every session starts clean.",
-      detailed: "Anonymous design treats every participant identically and remembers nothing. It maximizes privacy and lowers barriers to vulnerable participation, at the cost of continuity and personalization.",
+      detailed: "Anonymous design treats every participant identically and remembers nothing — no identity tracking of any kind. It maximizes privacy and lowers barriers to vulnerable participation, at the cost of continuity and personalization.",
       example: "A confession-booth installation that visibly shreds its only transcript as each visitor leaves."
     },
     "Identity": {
@@ -347,39 +420,12 @@ export const VALUE_STARTERS = {
       detailed: "Biometric response reads the body directly and adapts to genuine, unfakeable states: fear, calm, attention. It enables experiences that meet participants exactly where they are, with correspondingly serious consent obligations.",
       example: "A deep-sea descent that only surfaces the anglerfish once your measured heart rate has settled."
     }
-  },
-  "tech": {
-    "none": {
-      short: "No technology at all — a fully physical, analog experience.",
-      detailed: "Tech-free design relies on space, objects, print, and people. Nothing can crash, nothing needs charging, and nothing stands between participants and the material — but every effect must be achieved physically.",
-      example: "A 1940s radio-drama evening staged entirely with practical props, live foley, and actors — not one screen in the building."
-    },
-    "2D": {
-      short: "A screen-based experience on ordinary displays.",
-      detailed: "2D delivery uses the screens everyone already has — phones, laptops, projectors. It is the most accessible and distributable platform, trading physical presence for reach, and it rewards strong interface craft.",
-      example: "A browser-based archive dive where dragging documents around a virtual desk slowly assembles a family's immigration story."
-    },
-    "AR": {
-      short: "Digital content overlaid onto the real world.",
-      detailed: "Augmented reality annotates reality: the participant's actual surroundings remain primary, with digital layers adding what is invisible — the past, the hidden, the explanatory. Strongest where place itself matters.",
-      example: "A battlefield walk where raising your phone shows the troop lines advancing across the very field you are standing on."
-    },
-    "VR": {
-      short: "A fully immersive simulated space.",
-      detailed: "Virtual reality replaces the participant's entire sensory world, enabling the impossible: other scales, other centuries, other bodies. Total control of the environment comes with hardware friction and per-person throughput limits.",
-      example: "A cell-biology voyage where students shrink to protein scale and physically duck under a passing ribosome."
-    },
-    "XR": {
-      short: "A mixed system spanning physical and digital space.",
-      detailed: "Extended reality blends physical sets, tracked objects, and digital layers into one continuous world — real props you can touch, virtual events you can only see. The richest presence available, and the most complex to orchestrate.",
-      example: "A haunted manor where the physical door you push creaks open onto a virtual ballroom, and the cold you feel is a real fan."
-    }
   }
 };
 
 /* Builds the full schema-v3 default taxonomy with stable ids on
-   every column and every value. Value ids are deterministic for
-   the defaults so resets stay stable across sessions. */
+   every column and every element. Element ids are deterministic
+   for the defaults so resets stay stable across sessions. */
 export function buildDefaultTaxonomy() {
   const columns = structuredClone(DEFAULT_COLUMNS);
   const rows = DEFAULT_ROWS.map((row, r) =>
@@ -391,7 +437,8 @@ export function buildDefaultTaxonomy() {
         text,
         shortDescription: starter.short,
         detailedDescription: starter.detailed,
-        example: starter.example
+        example: starter.example,
+        ...VALUE_MANUSCRIPT_FIELDS
       };
     })
   );
