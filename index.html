@@ -3,45 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Immersive Experience Design Taxonomy</title>
-  <meta name="description" content="An interactive framework for designing immersive experiences — explore the taxonomy, read its design dimensions, and generate experience concepts." />
+  <title>IXD — Immersive Experience Design Taxonomy</title>
+  <meta name="description" content="A design methodology for immersive experiences. Choose a topic, make intentional design decisions across ten dimensions, and generate a complete experience concept." />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
   <!-- ============================================================
-       SITE HEADER — brand, mode switcher, and account controls
+       SITE HEADER — brand, admin edit toggle, account controls
        ============================================================ -->
   <header class="site-header">
     <div class="header-inner">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">Ix</span>
-        <span class="brand-name">Immersive Taxonomy</span>
+        <span class="brand-mark" aria-hidden="true">IXD</span>
+        <span class="brand-name">Immersive Experience Design</span>
       </div>
 
-      <!-- Mode switcher: the Edit tab only appears for admins -->
-      <nav class="mode-toggle" aria-label="Mode">
-        <button id="idea-mode-btn" class="mode-btn is-active" type="button">💡 Design Ideas</button>
-        <button id="inspire-mode-btn" class="mode-btn" type="button">✨ Inspiration</button>
-        <button id="edit-mode-btn" class="mode-btn" type="button">✏️ Edit</button>
-      </nav>
+      <div class="header-actions">
+        <!-- Admins only: switches the taxonomy into editing mode -->
+        <button id="edit-mode-btn" class="account-btn" type="button" hidden>Edit Taxonomy</button>
 
-      <!-- Account controls (upper right). Hidden entirely until
-           Firebase is configured. script.js swaps the two states. -->
-      <div id="account-area" class="account-area" hidden>
-        <div id="auth-buttons">
-          <button id="signin-btn" class="account-btn" type="button">Sign In</button>
-          <button id="signup-btn" class="account-btn account-btn-solid" type="button">Sign Up</button>
-        </div>
-        <div id="account-menu-wrap" class="account-menu-wrap" hidden>
-          <button id="account-btn" class="account-btn" type="button" aria-haspopup="true" aria-expanded="false">
-            <span aria-hidden="true">👤</span>
-            <span id="account-name" class="account-name"></span>
-            <span aria-hidden="true">▾</span>
-          </button>
-          <div id="account-dropdown" class="account-dropdown" hidden>
-            <button id="menu-library-btn" type="button">📚 Saved Experiences</button>
-            <button id="menu-signout-btn" type="button">Sign Out</button>
+        <!-- Account controls. Hidden until Firebase is configured. -->
+        <div id="account-area" class="account-area" hidden>
+          <div id="auth-buttons">
+            <button id="signin-btn" class="account-btn" type="button">Sign In</button>
+            <button id="signup-btn" class="account-btn account-btn-solid" type="button">Sign Up</button>
+          </div>
+          <div id="account-menu-wrap" class="account-menu-wrap" hidden>
+            <button id="account-btn" class="account-btn" type="button" aria-haspopup="true" aria-expanded="false">
+              <span id="account-initial" class="account-initial" aria-hidden="true"></span>
+              <span id="account-name" class="account-name"></span>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <div id="account-dropdown" class="account-dropdown" hidden>
+              <button id="menu-library-btn" type="button">Saved Experiences</button>
+              <button id="menu-signout-btn" type="button">Sign Out</button>
+            </div>
           </div>
         </div>
       </div>
@@ -52,19 +49,67 @@
        HERO
        ============================================================ -->
   <section class="hero">
-    <p class="hero-eyebrow">A design framework, not a spreadsheet</p>
-    <h1>Design immersive experiences, <span class="gradient-text">one dimension at a time</span></h1>
+    <p class="hero-eyebrow">A design methodology for immersive experiences</p>
+    <h1>Design immersive experiences, <span class="gradient-text">one decision at a time</span></h1>
     <p class="hero-sub">
-      Every column below is a design dimension of an immersive experience — from how participants
-      interact, to how the story unfolds, to the technology that delivers it. Click any heading or
-      the ⓘ beside a value to learn what it means, then combine elements into your next idea.
+      A guided framework for turning any topic — a lesson, a story, an exhibition, a training —
+      into an immersive experience, by making deliberate design decisions across ten dimensions.
     </p>
+    <a class="btn btn-primary hero-cta" href="#step-1">Start designing</a>
+  </section>
+
+  <!-- ============================================================
+       INTRODUCTION — who this is for, what problem it solves
+       ============================================================ -->
+  <section class="intro">
+    <div class="intro-grid">
+      <div class="intro-card">
+        <h3>Who it's for</h3>
+        <p>Educators, designers, researchers, and storytellers — anyone who wants people to
+        <em>experience</em> a subject rather than just hear about it. No background in
+        immersive design is needed.</p>
+      </div>
+      <div class="intro-card">
+        <h3>The problem it solves</h3>
+        <p>Immersive experiences usually get designed by instinct: pick a technology, add a story,
+        hope it works. Important decisions — how people participate, why they stay engaged, what
+        they take away — get made by accident.</p>
+      </div>
+      <div class="intro-card">
+        <h3>Why the taxonomy exists</h3>
+        <p>The taxonomy names the ten decisions every immersive experience makes, and the
+        options within each. This framework helps you design intentionally by choosing across
+        each dimension instead of defaulting to habit.</p>
+      </div>
+      <div class="intro-card">
+        <h3>When to use it</h3>
+        <p>At the start of a project, in an ideation workshop, in the classroom while teaching
+        experience design — or any time an idea feels flat and you want to see which design
+        dimensions you haven't considered yet.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       VIDEO — walkthrough embed (placeholder until a video exists).
+       To add your video: set INTRO_VIDEO_EMBED_URL near the top of
+       script.js to a YouTube or Loom *embed* URL.
+       ============================================================ -->
+  <section class="video-section">
+    <h2>Watch the taxonomy in action</h2>
+    <p class="section-sub">A short walkthrough of the framework — from choosing a topic to a finished experience concept.</p>
+    <div id="video-frame" class="video-frame">
+      <div class="video-placeholder">
+        <span class="video-placeholder-mark">▶</span>
+        <p>Walkthrough video coming soon</p>
+      </div>
+    </div>
   </section>
 
   <main>
 
     <!-- ============================================================
-         EDIT MODE TOOLBAR (admins / local mode only)
+         ADMIN EDIT TOOLBAR (visible only while editing)
          ============================================================ -->
     <section id="edit-tools" class="panel panel-stack" aria-label="Edit tools" hidden>
       <div class="toolbar-row">
@@ -79,7 +124,6 @@
           <span id="last-saved" class="panel-note"></span>
         </div>
       </div>
-
       <details class="backup-tools">
         <summary>Backup Tools (advanced)</summary>
         <div class="toolbar-group">
@@ -97,87 +141,124 @@
     </section>
 
     <!-- ============================================================
-         DESIGN IDEAS MODE TOOLBAR
+         STEP 1 — CHOOSE YOUR TOPIC
          ============================================================ -->
-    <section id="idea-tools" class="panel panel-stack" aria-label="Design ideas tools" hidden>
-      <div id="idea-topic-slot"></div>
-      <div class="toolbar-group">
-        <button id="gen-full-btn" class="btn btn-primary" type="button">✨ Generate Full Experience</button>
-        <button id="gen-spark-btn" class="btn" type="button">💡 Generate Inspiration</button>
-        <button id="regen-btn" class="btn" type="button">🔁 Regenerate</button>
-        <button id="random-path-btn" class="btn btn-brand" type="button">🎲 Generate From Random Path</button>
+    <section id="step-1" class="step-card">
+      <div class="step-head">
+        <span class="step-num" aria-hidden="true">1</span>
+        <div>
+          <h2>Choose your topic</h2>
+          <p class="section-sub">What should people experience? Any subject works — the framework does the rest.</p>
+        </div>
       </div>
-      <div class="toolbar-group">
-        <button id="randomize-btn" class="btn" type="button">Randomize Selection</button>
-        <button id="lock-selection-btn" class="btn" type="button">🔒 Lock Selection</button>
-        <button id="clear-btn" class="btn" type="button">Clear Selection</button>
+      <div class="topic-row">
+        <input
+          id="topic-input"
+          type="text"
+          placeholder='Try “cooking,” “video games,” “creative writing within non-fiction,” or “history of the Civil War”'
+          aria-label="Your topic"
+        />
       </div>
-      <p id="selection-summary" class="panel-note"></p>
     </section>
 
     <!-- ============================================================
-         INSPIRATION MODE TOOLBAR
+         STEP 2 — SHAPE THE EXPERIENCE WITH THE TAXONOMY
          ============================================================ -->
-    <section id="inspire-tools" class="panel panel-stack" aria-label="Inspiration tools" hidden>
-      <div id="inspire-topic-slot"></div>
-      <div class="toolbar-group">
-        <button id="inspire-full-btn" class="btn btn-primary" type="button">✨ Generate Full Experience</button>
-        <button id="inspire-spark-btn" class="btn" type="button">💡 Generate Inspiration</button>
-        <button id="inspire-regen-btn" class="btn" type="button">🔁 Regenerate</button>
-        <button id="new-recipe-btn" class="btn btn-brand" type="button">🎲 New Recipe</button>
+    <section id="step-2" class="step-card">
+      <div class="step-head">
+        <span class="step-num" aria-hidden="true">2</span>
+        <div>
+          <h2>Shape your experience</h2>
+          <p class="section-sub">
+            Each column is one design decision — how people interact, how the story works, what
+            technology carries it. Pick one value per column, or as many decisions as you want to
+            make yourself. The <span class="inline-info">i</span> beside anything explains it.
+          </p>
+        </div>
       </div>
-      <p class="panel-note">
-        Each card below is one design dimension. 🔄 rerolls a single card, 🔓/🔒 locks it so
-        “New Recipe” keeps it. <span id="lock-summary"></span>
+
+      <div class="search-bar">
+        <input
+          id="search-input"
+          type="search"
+          placeholder="Search the taxonomy — categories, values, descriptions, examples…"
+          autocomplete="off"
+          aria-label="Search the taxonomy"
+        />
+        <div id="search-results" class="search-results" hidden role="listbox"></div>
+      </div>
+
+      <div class="workspace">
+        <div id="table-container" class="table-wrap"></div>
+      </div>
+
+      <div class="step-footer">
+        <p id="selection-summary" class="panel-note"></p>
+        <div class="toolbar-group">
+          <button id="complete-random-btn" class="btn" type="button"
+            title="Keeps your choices and randomly fills every dimension you haven't decided yet">
+            Complete My Selections Randomly
+          </button>
+          <button id="clear-btn" class="btn btn-quiet" type="button" title="Deselect everything">Clear Selections</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         STEP 3 — GENERATE
+         ============================================================ -->
+    <section id="step-3" class="step-card">
+      <div class="step-head">
+        <span class="step-num" aria-hidden="true">3</span>
+        <div>
+          <h2>Generate your experience</h2>
+          <p class="section-sub">The generator interprets your topic and your design decisions into a complete experience concept.</p>
+        </div>
+      </div>
+      <p id="readiness" class="readiness"></p>
+      <button id="generate-btn" class="btn btn-primary btn-large" type="button" hidden>Generate Experience</button>
+    </section>
+
+    <!-- ============================================================
+         STEP 4 — REVIEW &amp; SAVE (appears after generating)
+         ============================================================ -->
+    <section id="step-4" class="step-card" hidden>
+      <div class="step-head">
+        <span class="step-num" aria-hidden="true">4</span>
+        <div>
+          <h2>Review and save</h2>
+          <p class="section-sub">Read it over, save it to your library, or generate a fresh variation from the same decisions.</p>
+        </div>
+      </div>
+      <div id="idea-output" class="idea-output"></div>
+      <div id="idea-actions" class="idea-actions"></div>
+    </section>
+
+    <!-- ============================================================
+         THE BOOK — placeholder for the companion book
+         ============================================================ -->
+    <section class="book-section">
+      <h2>The companion book</h2>
+      <p class="section-sub">
+        The taxonomy comes from a forthcoming book on immersive experience design. Chapter
+        references for each dimension will appear here.
       </p>
+      <p class="panel-note">Coming soon.</p>
     </section>
-
-    <!-- Shared topic input (script.js moves it into the active panel) -->
-    <div id="topic-row" class="topic-row" hidden>
-      <label for="topic-input" class="topic-label">Topic</label>
-      <input
-        id="topic-input"
-        type="text"
-        placeholder='Try “cooking,” “video games,” “creative writing within non-fiction,” or “history of the Civil War”'
-      />
-    </div>
-
-    <!-- ============================================================
-         TAXONOMY SEARCH — categories, values, descriptions, examples
-         ============================================================ -->
-    <div class="search-bar">
-      <input
-        id="search-input"
-        type="search"
-        placeholder="🔍 Search the taxonomy — categories, values, descriptions, examples…"
-        autocomplete="off"
-        aria-label="Search the taxonomy"
-      />
-      <div id="search-results" class="search-results" hidden role="listbox"></div>
-    </div>
-
-    <!-- Short hint that changes with the mode -->
-    <p id="mode-hint" class="mode-hint"></p>
-
-    <!-- ============================================================
-         THE WORKSPACE — taxonomy grid or recipe board
-         ============================================================ -->
-    <section class="workspace">
-      <div id="table-container" class="table-wrap"></div>
-      <div id="recipe-board" class="recipe-board" hidden></div>
-    </section>
-
-    <!-- Generated experience concept appears here as a report card -->
-    <section id="idea-output" class="idea-output" hidden></section>
 
   </main>
 
   <!-- ============================================================
-       FOOTER — version info (sign-in now lives in the header)
+       FOOTER
        ============================================================ -->
   <footer class="site-footer">
-    <p>Immersive Experience Design Taxonomy · v3.0</p>
-    <p>Runs in your browser — no account needed to explore and generate ideas. Create one to save your experiences.</p>
+    <p class="footer-brand">IXD — Immersive Experience Design</p>
+    <p>A Ruscella Immersive framework · Created by Obeid</p>
+    <p>
+      Version 4.0 ·
+      <a href="https://github.com/HuskyJesus/ImmersiveTaxonomyWebsite" target="_blank" rel="noopener">GitHub</a>
+    </p>
+    <p id="footer-copyright"></p>
   </footer>
 
   <!-- ============================================================
@@ -270,11 +351,10 @@
   <!-- Saved Experiences library -->
   <dialog id="library-modal" class="modal modal-wide" aria-labelledby="library-title">
     <div class="modal-head">
-      <h2 id="library-title">📚 Saved Experiences</h2>
+      <h2 id="library-title">Saved Experiences</h2>
       <button id="library-close" class="modal-close" type="button" aria-label="Close">✕</button>
     </div>
 
-    <!-- List view -->
     <div id="library-list-view">
       <div class="library-controls">
         <input id="lib-search" type="search" placeholder="Search title, topic, notes…" aria-label="Search saved experiences" />
@@ -284,13 +364,12 @@
           <option value="title">Title A–Z</option>
           <option value="favorite">Favorites first</option>
         </select>
-        <label class="lib-filter"><input id="lib-fav-only" type="checkbox" /> ★ Favorites only</label>
+        <label class="lib-filter"><input id="lib-fav-only" type="checkbox" /> Favorites only</label>
       </div>
       <div id="lib-list" class="lib-list"></div>
       <p id="lib-empty" class="panel-note" hidden>Nothing saved yet — generate an experience and press “Save Experience”.</p>
     </div>
 
-    <!-- Detail view -->
     <div id="library-detail-view" hidden>
       <button id="lib-back" class="btn" type="button">← Back to list</button>
       <div class="lib-detail-head">
@@ -306,7 +385,7 @@
       <div class="toolbar-group lib-actions">
         <button id="lib-save-changes" class="btn btn-primary" type="button">Save Changes</button>
         <button id="lib-load" class="btn btn-brand" type="button">Load Into Generator</button>
-        <button id="lib-regen" class="btn" type="button">🔁 Regenerate &amp; View</button>
+        <button id="lib-regen" class="btn" type="button">Regenerate Variation</button>
         <button id="lib-duplicate" class="btn" type="button">Duplicate</button>
         <button id="lib-delete" class="btn btn-danger" type="button">Delete</button>
       </div>

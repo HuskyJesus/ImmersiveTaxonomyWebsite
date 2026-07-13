@@ -1,5 +1,5 @@
 /* ============================================================
-   Immersive Experience Design Taxonomy — script.js
+   IXD — Immersive Experience Design Taxonomy — script.js
 
    How this file is organized:
      1. Imports, constants, admin allowlist
@@ -12,34 +12,37 @@
      8. Saved experiences (Firestore subcollection)
      9. Experience library UI
     10. Rendering — the taxonomy grid
-    11. Rendering — the recipe board (Inspiration mode)
-    12. Description viewer + editor dialogs
-    13. Taxonomy search
-    14. Edit Mode actions
-    15. Design Ideas Mode actions
-    16. Inspiration Mode actions
-    17. The idea generator
-    18. Mode switching + wiring everything up
+    11. Description viewer + editor dialogs
+    12. Taxonomy search
+    13. Edit Mode actions
+    14. Selection actions + the guided workflow
+    15. The experience generator (AI provider or local)
+    16. Page setup + wiring everything up
+
+   THE GUIDED WORKFLOW
+   The page walks a first-time visitor through one linear process:
+     Step 1  choose a topic
+     Step 2  make design decisions on the taxonomy (one per column)
+     Step 3  generate — the button appears only once a topic exists
+             and at least MIN_DECISIONS dimensions are decided
+     Step 4  review, save, or start over
+
+   GENERATION
+   generateIdea() asks the AI provider layer (ai-provider.js)
+   first; if no provider is configured or the call fails, it falls
+   back to the built-in local generator. The rest of the app never
+   knows which one produced the idea.
 
    DATA MODEL (schema version 3)
-   Columns AND values carry stable ids and descriptions — renaming
-   either never loses anything keyed to it:
-     {
-       schemaVersion: 3,
+   Columns AND values carry stable ids and descriptions:
+     { schemaVersion: 3,
        columns: [{ id, name, shortDescription, detailedDescription, example }],
-       rows: [[{ id, text, shortDescription, detailedDescription, example }, ...], ...]
-     }
-
-   ACCESS LEVELS
-     Public       — view, read descriptions, select, randomize, generate
-     Signed-in    — everything public + save experiences to their library
-     Administrator— everything + Edit Mode + cloud taxonomy saving
-   The Firestore Security Rules (firestore.rules) are the real
-   authority; the ADMIN_UIDS list below only shapes the UI.
+       rows: [[{ id, text, shortDescription, detailedDescription, example }, ...]] }
    ============================================================ */
 
 import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
 import { DEFAULT_COLUMNS, VALUE_STARTERS, buildDefaultTaxonomy } from "./starter-content.js";
+import { aiAvailable, generateWithAI } from "./ai-provider.js";
 
 /* ------------------------------------------------------------
    1. CONSTANTS + ADMIN ALLOWLIST
@@ -50,6 +53,14 @@ const FIREBASE_VERSION = "10.12.2";
 const CLOUD_DOC_PATH = ["taxonomy", "current"];
 const SCHEMA_VERSION = 3;
 const EXPERIENCE_SCHEMA_VERSION = 1;
+
+/* Minimum number of decided dimensions before Generate appears */
+const MIN_DECISIONS = 3;
+
+/* To show the walkthrough video, paste a YouTube or Loom EMBED
+   URL here, e.g. "https://www.youtube-nocookie.com/embed/VIDEOID"
+   or "https://www.loom.com/embed/VIDEOID". Empty = placeholder. */
+const INTRO_VIDEO_EMBED_URL = "";
 
 /* The ONLY administrators. Creating an account never grants admin
    access — this list (mirrored in firestore.rules, which is the
@@ -64,7 +75,6 @@ function isAdminUid(uid) {
   return ADMIN_UIDS.includes(uid);
 }
 
-/* Shortcut for grabbing elements by id */
 const $ = (id) => document.getElementById(id);
 
 /* ------------------------------------------------------------
@@ -75,21 +85,18 @@ const $ = (id) => document.getElementById(id);
 let cloudMetaFromCache = { revision: null, dirty: false, dirtyAt: null };
 
 let taxonomy = loadLocalTaxonomy();  // the current framework data
-let mode = "idea";                   // "edit" | "idea" | "inspire"
-let selectedCells = new Set();       // Design Ideas selections, as "row:col" strings
-let lockedSelection = new Set();     // subset protected from Randomize
-let recipe = null;                   // Inspiration: row index per column (-1 = none)
-let lockedColumns = new Set();       // Inspiration: locked column indexes
-let lastGeneration = null;           // { kind, topic, idea, selections } — for Regenerate + Save
+let mode = "design";                 // "design" | "edit"
+let selectedCells = new Set();       // selections, as "row:col" strings
+let lastGeneration = null;           // { topic, idea, selections } — for variations + saving
 
 const cloud = {
   configured: isFirebaseConfigured(),
   ready: false,
   db: null,
   auth: null,
-  fns: null,           // firestore + auth functions from the dynamic imports
-  user: null,          // signed-in Firebase user (any account)
-  revision: null,      // updatedAt millis of the cloud version we're based on
+  fns: null,
+  user: null,
+  revision: null,
   dirty: false,
   saveTimer: null,
   saving: false
@@ -110,20 +117,14 @@ function makeValueId(text) {
   return `${slugify(text) || "value"}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/* A brand-new empty cell — every value gets a stable id and a
-   blank description record from the moment it exists. */
 function makeCell(text = "") {
   return { id: makeValueId(text), text, shortDescription: "", detailedDescription: "", example: "" };
 }
 
-/* Starter descriptions for a known default value (or blanks) */
 function starterFor(columnId, text) {
   return (VALUE_STARTERS[columnId] || {})[text] || { short: "", detailed: "", example: "" };
 }
 
-/* Wraps a plain-string cell (v1/v2 data) into a v3 cell object,
-   pulling in starter descriptions when the value is a known
-   default. Existing text is never altered. */
 function upgradeCell(text, columnId) {
   const starter = starterFor(columnId, text);
   return {
@@ -167,7 +168,6 @@ function isValidV1(data) {
   );
 }
 
-/* Fills in optional fields that older v3 data might lack */
 function tidyV3(data) {
   data.columns.forEach((c) => {
     c.shortDescription = c.shortDescription || "";
@@ -185,16 +185,13 @@ function tidyV3(data) {
 }
 
 /* MIGRATION: accepts v3, v2, or v1 shapes and returns v3.
-   - all existing ids are kept
-   - missing descriptions are populated from starter content when
-     the value/column matches a known default; custom text is
-     never overwritten
-   - schemaVersion is bumped to 3 */
+   Existing ids are kept; missing descriptions are populated from
+   starter content for known defaults; custom text is never
+   overwritten. */
 function normalizeTaxonomy(data) {
   if (isValidV3(data)) return tidyV3(data);
 
   if (isValidV2(data)) {
-    // v2: column objects (keep their ids + descriptions), string cells
     return {
       schemaVersion: 3,
       columns: data.columns.map((c) => ({
@@ -209,7 +206,6 @@ function normalizeTaxonomy(data) {
   }
 
   if (isValidV1(data)) {
-    // v1: plain column names + string cells
     const byName = Object.fromEntries(DEFAULT_COLUMNS.map((c) => [c.name, c]));
     const columns = data.columns.map((name) => {
       const preset = byName[name];
@@ -229,7 +225,6 @@ function normalizeTaxonomy(data) {
 
 /* ------------------------------------------------------------
    4. LOCAL PERSISTENCE
-   Stored shape: { taxonomy, cloudRevision, dirty, dirtyAt }
    ------------------------------------------------------------ */
 function loadLocalTaxonomy() {
   try {
@@ -242,12 +237,11 @@ function loadLocalTaxonomy() {
         return tax;
       }
     }
-    // One-time migration from older storage keys
     for (const key of LEGACY_KEYS) {
       const legacy = localStorage.getItem(key);
       if (!legacy) continue;
       const parsed = JSON.parse(legacy);
-      const tax = normalizeTaxonomy(parsed.taxonomy || parsed);   // v2 wrapped, v1 bare
+      const tax = normalizeTaxonomy(parsed.taxonomy || parsed);
       if (tax) {
         if (parsed.dirty) cloudMetaFromCache = { revision: parsed.cloudRevision ?? null, dirty: true, dirtyAt: parsed.dirtyAt ?? null };
         return tax;
@@ -270,8 +264,6 @@ function saveLocal() {
 
 /* ------------------------------------------------------------
    5. CLOUD SYNC (Cloud Firestore)
-   Firestore can't store arrays-of-arrays, so the grid is saved
-   column-major: each column carries its own values list.
    ------------------------------------------------------------ */
 function serializeForCloud() {
   return {
@@ -288,8 +280,6 @@ function serializeForCloud() {
   };
 }
 
-/* Accepts v3 cloud docs (value objects) AND v2 docs (value strings),
-   so existing published data migrates transparently on load. */
 function deserializeFromCloud(data) {
   if (!data || !Array.isArray(data.columns) || data.columns.length === 0) return null;
   const rowCount = data.rowCount ?? Math.max(...data.columns.map((c) => (c.values || []).length), 0);
@@ -303,7 +293,7 @@ function deserializeFromCloud(data) {
   const rows = Array.from({ length: rowCount }, (_, r) =>
     data.columns.map((c, ci) => {
       const v = (c.values || [])[r];
-      if (v && typeof v === "object") {                    // v3 cell
+      if (v && typeof v === "object") {
         return {
           id: v.id || makeValueId(v.text || ""),
           text: v.text || "",
@@ -312,7 +302,7 @@ function deserializeFromCloud(data) {
           example: v.example || ""
         };
       }
-      return upgradeCell(typeof v === "string" ? v : "", columns[ci].id);   // v2 cell
+      return upgradeCell(typeof v === "string" ? v : "", columns[ci].id);
     })
   );
   const tax = { schemaVersion: 3, columns, rows };
@@ -346,7 +336,6 @@ async function initCloud() {
   cloud.ready = true;
 }
 
-/* Priority: Firestore → local cache (already loaded) → default */
 async function loadFromCloud() {
   const { doc, getDoc } = cloud.fns;
   const snap = await getDoc(doc(cloud.db, ...CLOUD_DOC_PATH));
@@ -362,7 +351,6 @@ async function loadFromCloud() {
   }
   const cloudRevision = data.updatedAt?.toMillis?.() ?? null;
 
-  // If this browser holds unsaved edits, don't silently discard either side.
   if (cloudMetaFromCache.dirty) {
     const cloudIsNewer =
       cloudRevision && cloudMetaFromCache.revision && cloudRevision > cloudMetaFromCache.revision;
@@ -384,7 +372,7 @@ async function loadFromCloud() {
   cloud.revision = cloudRevision;
   cloud.dirty = false;
   saveLocal();
-  refreshWorkspace();
+  renderTable();
   setSyncStatus("ok", "All changes saved");
   updateLastSaved(cloudRevision);
 }
@@ -443,7 +431,7 @@ async function restoreCloudVersion() {
     cloud.dirty = false;
     resetSelections();
     saveLocal();
-    refreshWorkspace();
+    renderTable();
     setSyncStatus("ok", "Restored the last saved cloud version.");
     updateLastSaved(cloud.revision);
   } catch (err) {
@@ -463,7 +451,6 @@ function updateLastSaved(millis) {
     : "";
 }
 
-/* Every taxonomy edit funnels through here */
 function markChanged() {
   cloud.dirty = true;
   saveLocal();
@@ -474,9 +461,9 @@ function markChanged() {
       setSyncStatus("pending", "Offline changes pending — sign in as admin to save them to the cloud.");
     }
   } else {
-    cloud.dirty = false;   // local mode: localStorage IS the save
+    cloud.dirty = false;
     saveLocal();
-    setSyncStatus("local", "Saved in this browser ✓ (cloud sync not configured)");
+    setSyncStatus("local", "Saved in this browser (cloud sync not configured)");
   }
 }
 
@@ -489,12 +476,9 @@ window.addEventListener("beforeunload", (e) => {
 
 /* ------------------------------------------------------------
    6. AUTHENTICATION + USER ACCOUNTS
-   Email/password via Firebase Auth. Registration creates a
-   users/{uid} profile document. Passwords never touch Firestore.
    ------------------------------------------------------------ */
 let authMode = "signin";   // "signin" | "signup" | "reset"
 
-/* Friendly messages for common Firebase auth error codes */
 function authErrorMessage(err) {
   const code = err?.code || "";
   const messages = {
@@ -566,7 +550,6 @@ async function submitAuth() {
       if (password.length < 6) { showAuthError("Please choose a password of at least 6 characters."); submitBtn.disabled = false; return; }
       if (password !== confirm) { showAuthError("The two passwords don't match."); submitBtn.disabled = false; return; }
 
-      // Creating the account signs the user in automatically
       const cred = await cloud.fns.createUserWithEmailAndPassword(cloud.auth, email, password);
       await cloud.fns.updateProfile(cred.user, { displayName: name });
       await writeUserProfile(cred.user, name, true);
@@ -583,8 +566,6 @@ async function submitAuth() {
   submitBtn.disabled = false;
 }
 
-/* Creates or refreshes users/{uid}. Only profile metadata is
-   stored — never passwords, never roles. */
 async function writeUserProfile(user, displayName, isNew) {
   try {
     const { doc, setDoc, serverTimestamp } = cloud.fns;
@@ -601,7 +582,7 @@ async function writeUserProfile(user, displayName, isNew) {
 }
 
 async function signOutUser() {
-  if (cloud.dirty && isAdminUid(cloud.user?.uid)) await saveToCloud();   // don't lose admin work
+  if (cloud.dirty && isAdminUid(cloud.user?.uid)) await saveToCloud();
   await cloud.fns.signOut(cloud.auth);
   closeAccountDropdown();
 }
@@ -617,19 +598,20 @@ function applyAccessControl() {
   $("edit-mode-btn").hidden = !canEdit();
   $("restore-cloud-btn").hidden = !(cloud.configured && cloud.user && isAdminUid(cloud.user.uid));
 
-  // Header account controls
   $("account-area").hidden = !cloud.configured;
   if (cloud.configured) {
     const signedIn = !!cloud.user;
     $("auth-buttons").hidden = signedIn;
     $("account-menu-wrap").hidden = !signedIn;
     if (signedIn) {
-      $("account-name").textContent = cloud.user.displayName || cloud.user.email;
+      const name = cloud.user.displayName || cloud.user.email;
+      $("account-name").textContent = name;
+      $("account-initial").textContent = name.charAt(0).toUpperCase();
     }
   }
 
-  if (mode === "edit" && !canEdit()) setMode("idea");
-  refreshSaveButton();
+  if (mode === "edit" && !canEdit()) setMode("design");
+  renderIdeaActions();
 }
 
 function onAuthChanged(user) {
@@ -641,7 +623,6 @@ function onAuthChanged(user) {
   }
 }
 
-/* Account dropdown open/close */
 function toggleAccountDropdown() {
   const dd = $("account-dropdown");
   dd.hidden = !dd.hidden;
@@ -655,33 +636,21 @@ function closeAccountDropdown() {
 
 /* ------------------------------------------------------------
    8. SAVED EXPERIENCES (users/{uid}/savedExperiences/{id})
-   Structured content only — no raw HTML is ever stored.
    ------------------------------------------------------------ */
 function experiencesCollection() {
   const { collection } = cloud.fns;
   return collection(cloud.db, "users", cloud.user.uid, "savedExperiences");
 }
 
-/* Snapshot of the current selections with STABLE ids, so a saved
-   experience survives renames and can be reloaded later. */
+/* Snapshot of the current selections with STABLE ids */
 function captureSelections() {
   const sels = [];
-  if (mode === "inspire" && recipe) {
-    taxonomy.columns.forEach((col, c) => {
-      const r = recipe[c];
-      if (r >= 0 && taxonomy.rows[r][c].text.trim() !== "") {
-        const cell = taxonomy.rows[r][c];
-        sels.push({ columnId: col.id, columnName: col.name, valueId: cell.id, valueText: cell.text });
-      }
-    });
-  } else {
-    selectedCells.forEach((key) => {
-      const [r, c] = key.split(":").map(Number);
-      const cell = taxonomy.rows[r][c];
-      if (cell.text.trim() === "") return;
-      sels.push({ columnId: taxonomy.columns[c].id, columnName: taxonomy.columns[c].name, valueId: cell.id, valueText: cell.text });
-    });
-  }
+  selectedCells.forEach((key) => {
+    const [r, c] = key.split(":").map(Number);
+    const cell = taxonomy.rows[r][c];
+    if (cell.text.trim() === "") return;
+    sels.push({ columnId: taxonomy.columns[c].id, columnName: taxonomy.columns[c].name, valueId: cell.id, valueText: cell.text });
+  });
   return sels;
 }
 
@@ -696,26 +665,26 @@ async function saveCurrentExperience() {
       schemaVersion: EXPERIENCE_SCHEMA_VERSION,
       title: lastGeneration.idea.title,
       topic: lastGeneration.topic,
-      kind: lastGeneration.kind,                 // "full" | "spark"
+      kind: "full",
       notes: "",
       favorite: false,
       selections: lastGeneration.selections,
-      content: lastGeneration.idea,              // structured strings, no HTML
+      content: lastGeneration.idea,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    if (btn) { btn.textContent = "Saved ✓ — view in Saved Experiences"; }
+    if (btn) { btn.textContent = "Saved — view in Saved Experiences"; }
   } catch (err) {
     console.error("Could not save experience:", err);
-    if (btn) { btn.disabled = false; btn.textContent = "💾 Save Experience (failed — try again)"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Save Experience (failed — try again)"; }
   }
 }
 
 /* ------------------------------------------------------------
    9. EXPERIENCE LIBRARY UI
    ------------------------------------------------------------ */
-let libraryItems = [];        // [{id, data}]
-let libraryOpenItem = null;   // the item shown in detail view
+let libraryItems = [];
+let libraryOpenItem = null;
 
 async function openLibrary() {
   closeAccountDropdown();
@@ -769,8 +738,7 @@ function renderLibraryList() {
       : "";
     row.innerHTML = `
       <span class="lib-item-fav">${it.data.favorite ? "★" : "☆"}</span>
-      <span class="lib-item-main"><strong></strong><small></small></span>
-      <span class="lib-item-kind">${it.data.kind === "spark" ? "💡" : "✨"}</span>`;
+      <span class="lib-item-main"><strong></strong><small></small></span>`;
     row.querySelector("strong").textContent = it.data.title;
     row.querySelector("small").textContent = `${it.data.topic} · ${when}`;
     row.addEventListener("click", () => openLibraryDetail(it));
@@ -807,7 +775,7 @@ async function saveLibraryChanges() {
     });
     libraryOpenItem.data.title = newTitle;
     libraryOpenItem.data.notes = newNotes;
-    $("lib-save-changes").textContent = "Saved ✓";
+    $("lib-save-changes").textContent = "Saved";
     setTimeout(() => ($("lib-save-changes").textContent = "Save Changes"), 1500);
   } catch (err) {
     alert("Could not save changes: " + err.message);
@@ -862,12 +830,10 @@ async function deleteLibraryItem() {
   }
 }
 
-/* Maps saved selections (stable ids, name fallbacks) back onto the
-   CURRENT taxonomy and selects them in Design Ideas mode. */
+/* Maps saved selections back onto the CURRENT taxonomy */
 function loadSelectionsIntoGenerator(saved) {
-  setMode("idea");
+  setMode("design");
   selectedCells.clear();
-  lockedSelection.clear();
   (saved.selections || []).forEach((s) => {
     let c = taxonomy.columns.findIndex((col) => col.id === s.columnId);
     if (c < 0) c = taxonomy.columns.findIndex((col) => col.name === s.columnName);
@@ -879,44 +845,34 @@ function loadSelectionsIntoGenerator(saved) {
   });
   $("topic-input").value = saved.topic || "";
   renderTable();
+  updateReadiness();
 }
 
 function libraryLoad() {
   if (!libraryOpenItem) return;
   loadSelectionsIntoGenerator(libraryOpenItem.data);
   $("library-modal").close();
+  $("step-2").scrollIntoView({ behavior: "smooth" });
 }
 
-/* Regenerate from the same recipe: a fresh variation appears in the
-   generator; saving it creates a separate library entry. */
 function libraryRegenerate() {
   if (!libraryOpenItem) return;
-  const kind = libraryOpenItem.data.kind || "full";
   loadSelectionsIntoGenerator(libraryOpenItem.data);
   $("library-modal").close();
-  generateIdea(kind);
+  generateIdea();
 }
 
 /* ------------------------------------------------------------
    10. RENDERING — THE TAXONOMY GRID
+   Each column reads as one design decision: the header names it,
+   the tooltip explains it, and one value per column is the goal.
    ------------------------------------------------------------ */
-function refreshWorkspace() {
-  if (mode === "inspire") {
-    recipe = null;
-    lockedColumns.clear();
-    newRecipe();
-  } else {
-    renderTable();
-  }
-}
-
 function renderTable() {
   const container = $("table-container");
   container.innerHTML = "";
 
   const table = document.createElement("table");
 
-  /* ----- Header row (the design dimensions) ----- */
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
 
@@ -933,7 +889,7 @@ function renderTable() {
       name.spellcheck = false;
       name.textContent = col.name;
       name.addEventListener("blur", () => {
-        col.name = name.textContent.trim() || "Untitled";   // id stays stable
+        col.name = name.textContent.trim() || "Untitled";
         name.textContent = col.name;
         markChanged();
       });
@@ -956,9 +912,11 @@ function renderTable() {
       th.className = "th-info";
       th.tabIndex = 0;
       th.setAttribute("role", "button");
-      th.setAttribute("aria-label", `About the ${col.name} dimension`);
-      if (col.shortDescription) th.title = col.shortDescription;
-      th.innerHTML = `<span class="th-label"></span> <span class="info-icon" aria-hidden="true">ⓘ</span>`;
+      th.setAttribute("aria-label", `About the ${col.name} decision`);
+      th.title = col.shortDescription
+        ? `${col.shortDescription} Click for the full explanation.`
+        : `Click to learn about ${col.name}.`;
+      th.innerHTML = `<span class="th-decision">Decision ${colIndex + 1}</span><span class="th-label"></span>`;
       th.querySelector(".th-label").textContent = col.name;
       const open = () => openInfoModal({ type: "column", c: colIndex });
       th.addEventListener("click", open);
@@ -979,7 +937,6 @@ function renderTable() {
   thead.append(headRow);
   table.append(thead);
 
-  /* ----- Body rows (the values) ----- */
   const tbody = document.createElement("tbody");
 
   taxonomy.rows.forEach((row, rowIndex) => {
@@ -989,7 +946,6 @@ function renderTable() {
       const td = document.createElement("td");
 
       if (mode === "edit") {
-        // Editable text + a ✎ button for the value's descriptions
         td.className = "edit-cell";
         const text = document.createElement("span");
         text.className = "cell-text";
@@ -997,7 +953,7 @@ function renderTable() {
         text.spellcheck = false;
         text.textContent = cell.text;
         text.addEventListener("blur", () => {
-          cell.text = text.textContent.trim();   // id + descriptions stay
+          cell.text = text.textContent.trim();
           markChanged();
         });
 
@@ -1012,11 +968,14 @@ function renderTable() {
 
         td.append(text, edit);
       } else {
-        // Selectable value + ⓘ info button (info never changes selection)
         td.className = "selectable";
         const key = `${rowIndex}:${colIndex}`;
         if (selectedCells.has(key)) td.classList.add("is-selected");
-        if (lockedSelection.has(key)) td.classList.add("is-locked-cell");
+        if (cell.shortDescription) {
+          td.title = `${cell.shortDescription} Click to choose this for ${taxonomy.columns[colIndex].name}.`;
+        } else if (cell.text.trim() !== "") {
+          td.title = `Click to choose “${cell.text}” for ${taxonomy.columns[colIndex].name}.`;
+        }
 
         const label = document.createElement("span");
         label.className = "cell-text";
@@ -1027,10 +986,10 @@ function renderTable() {
           const info = document.createElement("button");
           info.className = "cell-info-btn";
           info.setAttribute("aria-label", `About ${cell.text}`);
-          if (cell.shortDescription) info.title = cell.shortDescription;
-          info.textContent = "ⓘ";
+          info.title = `What does “${cell.text}” mean?`;
+          info.textContent = "i";
           info.addEventListener("click", (e) => {
-            e.stopPropagation();   // the ⓘ opens info; it never selects
+            e.stopPropagation();   // info never changes the selection
             openInfoModal({ type: "value", c: colIndex, r: rowIndex });
           });
           td.append(info);
@@ -1060,89 +1019,11 @@ function renderTable() {
   table.append(tbody);
   container.append(table);
 
-  updateSelectionSummary();
-}
-
-function updateSelectionSummary() {
-  const el = $("selection-summary");
-  const count = selectedCells.size;
-  const locked = lockedSelection.size;
-
-  let text =
-    count === 0
-      ? "No cells selected yet — click cells in the framework below, or use Randomize. ⓘ opens a value's meaning without selecting it."
-      : `${count} cell${count === 1 ? "" : "s"} selected.`;
-  if (locked > 0) text += ` ${locked} locked — Randomize fills only the unlocked dimensions.`;
-  el.textContent = text;
-
-  $("lock-selection-btn").textContent =
-    locked > 0 ? "🔓 Unlock Selection" : "🔒 Lock Selection";
+  updateReadiness();
 }
 
 /* ------------------------------------------------------------
-   11. RENDERING — THE RECIPE BOARD (Inspiration Mode)
-   ------------------------------------------------------------ */
-function renderRecipeBoard() {
-  const board = $("recipe-board");
-  board.innerHTML = "";
-  if (!recipe) return;
-
-  taxonomy.columns.forEach((col, colIndex) => {
-    const rowIndex = recipe[colIndex];
-    const cell = rowIndex >= 0 ? taxonomy.rows[rowIndex][colIndex] : null;
-    const locked = lockedColumns.has(colIndex);
-
-    const card = document.createElement("div");
-    card.className = "recipe-card" + (locked ? " is-locked" : "");
-
-    const dim = document.createElement("button");
-    dim.className = "recipe-dimension recipe-dimension-btn";
-    dim.type = "button";
-    dim.title = col.shortDescription || `About ${col.name}`;
-    dim.innerHTML = `<span></span> <span class="info-icon" aria-hidden="true">ⓘ</span>`;
-    dim.querySelector("span").textContent = col.name;
-    dim.addEventListener("click", () => openInfoModal({ type: "column", c: colIndex }));
-
-    const val = document.createElement("button");
-    val.className = "recipe-value recipe-value-btn";
-    val.type = "button";
-    val.textContent = cell ? cell.text : "—";
-    if (cell && cell.shortDescription) val.title = cell.shortDescription;
-    if (cell) val.addEventListener("click", () => openInfoModal({ type: "value", c: colIndex, r: rowIndex }));
-
-    const actions = document.createElement("div");
-    actions.className = "recipe-actions";
-
-    const reroll = document.createElement("button");
-    reroll.className = "icon-btn";
-    reroll.title = `Reroll ${col.name}`;
-    reroll.textContent = "🔄";
-    reroll.addEventListener("click", () => rerollColumn(colIndex));
-
-    const lock = document.createElement("button");
-    lock.className = "icon-btn";
-    lock.title = locked ? `Unlock ${col.name}` : `Lock ${col.name}`;
-    lock.textContent = locked ? "🔒" : "🔓";
-    lock.addEventListener("click", () => toggleColumnLock(colIndex));
-
-    actions.append(reroll, lock);
-    card.append(dim, val, actions);
-    board.append(card);
-  });
-
-  updateLockSummary();
-}
-
-function updateLockSummary() {
-  const count = lockedColumns.size;
-  $("lock-summary").textContent =
-    count === 0 ? "" : `${count} dimension${count === 1 ? "" : "s"} locked.`;
-}
-
-/* ------------------------------------------------------------
-   12. DESCRIPTION VIEWER + EDITOR
-   One pair of dialogs serves both columns and values.
-   target = { type: "column"|"value", c, r? }
+   11. DESCRIPTION VIEWER + EDITOR
    ------------------------------------------------------------ */
 function targetRecord(target) {
   return target.type === "column"
@@ -1198,7 +1079,7 @@ function saveEditor() {
   const rec = targetRecord(editingTarget);
   const name = $("edit-cat-name").value.trim();
   if (editingTarget.type === "value") {
-    rec.text = name;                                  // may be empty; id stays stable
+    rec.text = name;
   } else {
     rec.name = name || "Untitled";
   }
@@ -1218,9 +1099,7 @@ function cancelEditor() {
 }
 
 /* ------------------------------------------------------------
-   13. TAXONOMY SEARCH
-   Searches category names, value names, all descriptions, and
-   examples. Selecting a result opens its information dialog.
+   12. TAXONOMY SEARCH
    ------------------------------------------------------------ */
 function searchTaxonomy(term) {
   const t = term.toLowerCase();
@@ -1273,10 +1152,10 @@ function renderSearchResults() {
 }
 
 /* ------------------------------------------------------------
-   14. EDIT MODE ACTIONS
+   13. EDIT MODE ACTIONS
    ------------------------------------------------------------ */
 function addRow() {
-  taxonomy.rows.push(taxonomy.columns.map(() => makeCell()));   // blank descriptions auto-created
+  taxonomy.rows.push(taxonomy.columns.map(() => makeCell()));
   afterStructureChange();
 }
 
@@ -1317,9 +1196,6 @@ function deleteColumn(colIndex) {
 
 function resetSelections() {
   selectedCells.clear();
-  lockedSelection.clear();
-  recipe = null;
-  lockedColumns.clear();
 }
 
 function afterStructureChange() {
@@ -1379,18 +1255,25 @@ function resetToDefault() {
 }
 
 /* ------------------------------------------------------------
-   15. DESIGN IDEAS MODE ACTIONS
+   14. SELECTION ACTIONS + THE GUIDED WORKFLOW
    ------------------------------------------------------------ */
 function toggleCell(key, td) {
+  const [, c] = key.split(":").map(Number);
   if (selectedCells.has(key)) {
     selectedCells.delete(key);
-    lockedSelection.delete(key);
-    td.classList.remove("is-selected", "is-locked-cell");
+    td.classList.remove("is-selected");
   } else {
+    // One decision per dimension: choosing a value replaces any
+    // other selection in the same column.
+    [...selectedCells].forEach((k) => {
+      if (Number(k.split(":")[1]) === c) selectedCells.delete(k);
+    });
+    td.closest("tbody").querySelectorAll(`td:nth-child(${c + 1}).is-selected`)
+      .forEach((el) => el.classList.remove("is-selected"));
     selectedCells.add(key);
     td.classList.add("is-selected");
   }
-  updateSelectionSummary();
+  updateReadiness();
 }
 
 function rowsWithValue(colIndex) {
@@ -1401,116 +1284,76 @@ function rowsWithValue(colIndex) {
   return candidates;
 }
 
-function lockedCellInColumn(colIndex) {
-  for (let r = 0; r < taxonomy.rows.length; r++) {
-    if (lockedSelection.has(`${r}:${colIndex}`)) return `${r}:${colIndex}`;
-  }
-  return null;
+/* Count of columns that have a selection */
+function decidedColumns() {
+  const cols = new Set();
+  selectedCells.forEach((k) => cols.add(Number(k.split(":")[1])));
+  return cols.size;
 }
 
-function toggleSelectionLock() {
-  if (lockedSelection.size > 0) {
-    lockedSelection.clear();
-    renderTable();
-    return;
-  }
-  if (selectedCells.size === 0) {
-    alert("Select some cells first, then lock them.");
-    return;
-  }
-
-  let trimmed = 0;
+/* Keeps every decision the user made and randomly fills the rest —
+   the result is always a complete recipe (one value per column). */
+function completeRandomly() {
   taxonomy.columns.forEach((_, colIndex) => {
-    let keptOne = false;
-    for (let r = 0; r < taxonomy.rows.length; r++) {
-      const key = `${r}:${colIndex}`;
-      if (!selectedCells.has(key)) continue;
-      if (!keptOne) {
-        lockedSelection.add(key);
-        keptOne = true;
-      } else {
-        selectedCells.delete(key);
-        trimmed++;
-      }
-    }
-  });
-
-  renderTable();
-  if (trimmed > 0) {
-    $("selection-summary").textContent +=
-      ` (${trimmed} extra cell${trimmed === 1 ? "" : "s"} removed — a recipe keeps one value per dimension.)`;
-  }
-}
-
-/* Randomize: a COMPLETE recipe — exactly one cell per column,
-   locked columns kept, columns with no usable values skipped. */
-function randomizeSelection() {
-  const next = new Set();
-  taxonomy.columns.forEach((_, colIndex) => {
-    const locked = lockedCellInColumn(colIndex);
-    if (locked) { next.add(locked); return; }
+    const alreadyDecided = [...selectedCells].some((k) => Number(k.split(":")[1]) === colIndex);
+    if (alreadyDecided) return;
     const candidates = rowsWithValue(colIndex);
-    if (candidates.length > 0) next.add(`${pick(candidates)}:${colIndex}`);
+    if (candidates.length > 0) selectedCells.add(`${pick(candidates)}:${colIndex}`);
   });
-  selectedCells = next;
   renderTable();
-}
-
-function randomPath() {
-  randomizeSelection();
-  generateIdea("full");
 }
 
 function clearSelection() {
   selectedCells.clear();
-  lockedSelection.clear();
   renderTable();
-  $("idea-output").hidden = true;
+}
+
+/* Step 3 gatekeeper: Generate appears only when the workflow is
+   ready — a topic plus at least MIN_DECISIONS decided dimensions. */
+function updateReadiness() {
+  const topicOk = $("topic-input").value.trim().length > 0;
+  const decided = decidedColumns();
+  const totalCols = taxonomy.columns.length;
+  const selOk = decided >= Math.min(MIN_DECISIONS, totalCols);
+
+  // Step 2 status line
+  $("selection-summary").textContent =
+    decided === 0
+      ? "No decisions yet — click one value in any column, or let the framework decide for you."
+      : `${decided} of ${totalCols} dimensions decided.`;
+
+  // Step 3 readiness + button
+  const missing = [];
+  if (!topicOk) missing.push("add a topic in Step 1");
+  if (!selOk) missing.push(`decide at least ${Math.min(MIN_DECISIONS, totalCols)} dimensions in Step 2 (or use “Complete My Selections Randomly”)`);
+
+  const ready = missing.length === 0;
+  $("generate-btn").hidden = !ready;
+  $("readiness").textContent = ready
+    ? `Ready — topic set and ${decided} of ${totalCols} dimensions decided.`
+    : `To generate: ${missing.join(", then ")}.`;
+  $("readiness").classList.toggle("is-ready", ready);
+}
+
+function startOver() {
+  selectedCells.clear();
+  lastGeneration = null;
+  $("topic-input").value = "";
+  $("step-4").hidden = true;
+  $("idea-output").innerHTML = "";
+  renderTable();
+  $("step-1").scrollIntoView({ behavior: "smooth" });
+  $("topic-input").focus();
 }
 
 /* ------------------------------------------------------------
-   16. INSPIRATION MODE ACTIONS
-   ------------------------------------------------------------ */
-function newRecipe() {
-  const previous = recipe;
-  recipe = taxonomy.columns.map((_, colIndex) => {
-    if (lockedColumns.has(colIndex) && previous && previous[colIndex] >= 0) {
-      return previous[colIndex];
-    }
-    const candidates = rowsWithValue(colIndex);
-    return candidates.length > 0 ? pick(candidates) : -1;
-  });
-  renderRecipeBoard();
-}
-
-function rerollColumn(colIndex) {
-  const candidates = rowsWithValue(colIndex);
-  if (candidates.length === 0) return;
-  const others = candidates.filter((r) => r !== recipe[colIndex]);
-  recipe[colIndex] = others.length > 0 ? pick(others) : candidates[0];
-  lockedColumns.delete(colIndex);
-  renderRecipeBoard();
-}
-
-function toggleColumnLock(colIndex) {
-  if (lockedColumns.has(colIndex)) {
-    lockedColumns.delete(colIndex);
-  } else {
-    lockedColumns.add(colIndex);
-  }
-  renderRecipeBoard();
-}
-
-/* ------------------------------------------------------------
-   17. THE IDEA GENERATOR
-   The generator now reads the DESCRIPTIONS of both the selected
-   values and their categories — the same editable text shown in
-   the info dialogs — so ideas are interpreted, not concatenated.
-   Everything runs locally.
+   15. THE EXPERIENCE GENERATOR
+   Tries the configured AI provider first (ai-provider.js); falls
+   back to the built-in local generator automatically. The output
+   shape is identical either way.
    ------------------------------------------------------------ */
 
-/* Generic fallback role per default dimension (used only when a
-   custom column has no description of its own) */
+/* Generic fallback role per default dimension */
 const COLUMN_ROLES = {
   "Interactivity": "what participants do",
   "Embodiment": "how present participants feel",
@@ -1541,8 +1384,6 @@ function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/* Turns a stored description sentence into a mid-sentence phrase:
-   lowercases the first letter and strips the trailing period. */
 function asClause(sentence) {
   const s = sentence.trim().replace(/\.$/, "");
   return s.charAt(0).toLowerCase() + s.slice(1);
@@ -1560,41 +1401,48 @@ function escapeHTML(text) {
   return div.innerHTML;
 }
 
-/* Collects the chosen CELLS grouped by column name */
+/* Chosen cells grouped by column name */
 function buildGroups() {
   const groups = {};
-
-  if (mode === "inspire") {
-    if (!recipe) return groups;
-    taxonomy.columns.forEach((col, colIndex) => {
-      const rowIndex = recipe[colIndex];
-      if (rowIndex < 0) return;
-      const cell = taxonomy.rows[rowIndex][colIndex];
-      if (cell.text.trim() !== "") groups[col.name] = [cell];
-    });
-  } else {
-    selectedCells.forEach((key) => {
-      const [r, c] = key.split(":").map(Number);
-      const cell = taxonomy.rows[r][c];
-      if (cell.text.trim() === "") return;
-      const colName = taxonomy.columns[c].name;
-      if (!groups[colName]) groups[colName] = [];
-      groups[colName].push(cell);
-    });
-  }
-
+  selectedCells.forEach((key) => {
+    const [r, c] = key.split(":").map(Number);
+    const cell = taxonomy.rows[r][c];
+    if (cell.text.trim() === "") return;
+    const colName = taxonomy.columns[c].name;
+    if (!groups[colName]) groups[colName] = [];
+    groups[colName].push(cell);
+  });
   return groups;
+}
+
+/* Rich selection details for the AI provider */
+function buildAIContext(topic) {
+  const selections = [];
+  selectedCells.forEach((key) => {
+    const [r, c] = key.split(":").map(Number);
+    const cell = taxonomy.rows[r][c];
+    if (cell.text.trim() === "") return;
+    const col = taxonomy.columns[c];
+    selections.push({
+      column: col.name,
+      columnDescription: col.shortDescription,
+      value: cell.text,
+      valueDescription: cell.shortDescription,
+      valueExample: cell.example
+    });
+  });
+  return { topic, selections };
 }
 
 function proseCells(cells = []) {
   return cells.filter((cell) => cell.text.toLowerCase() !== "none");
 }
 
-/* --- Topic analysis: matches the topic against domain profiles
-   so generated ideas use vocabulary that fits the subject --- */
+/* --- Topic analysis for the local generator --- */
 const DOMAIN_PROFILES = [
   {
     keywords: ["cook", "food", "recipe", "kitchen", "bak", "cuisine", "chef", "meal", "taste", "dining"],
+    personas: ["a first-time home cook", "a curious teenager who lives on takeout", "a retiree finally learning the family recipes"],
     artifacts: ["ingredients", "recipes", "technique", "flavor pairings", "food traditions"],
     actions: [
       "prep and combine real ingredients",
@@ -1609,6 +1457,7 @@ const DOMAIN_PROFILES = [
   },
   {
     keywords: ["game", "gaming", "esports", "arcade", "video"],
+    personas: ["a high-school student who plays but has never designed", "a teacher who wants to understand what their students love", "an aspiring indie developer"],
     artifacts: ["mechanics", "levels", "progression systems", "genres", "player strategies"],
     actions: [
       "learn a system by playing it",
@@ -1623,6 +1472,7 @@ const DOMAIN_PROFILES = [
   },
   {
     keywords: ["writ", "essay", "memoir", "non-fiction", "nonfiction", "journal", "poet", "author"],
+    personas: ["an adult with one true story they've never written down", "a college student drowning in essay structure rules", "a journaler ready to write for readers"],
     artifacts: ["voice", "memory", "structure", "evidence", "perspective", "revision"],
     actions: [
       "gather raw material from real life",
@@ -1637,6 +1487,7 @@ const DOMAIN_PROFILES = [
   },
   {
     keywords: ["history", "war", "civil", "ancient", "egypt", "rome", "greek", "revolution", "medieval", "century", "historical"],
+    personas: ["a middle-school student who thinks history is a list of dates", "a museum visitor with twenty minutes", "a lifelong documentary watcher who wants to go deeper"],
     artifacts: ["primary sources", "competing perspectives", "maps and geography", "pivotal decisions", "consequences"],
     actions: [
       "examine primary sources firsthand",
@@ -1651,6 +1502,7 @@ const DOMAIN_PROFILES = [
   },
   {
     keywords: ["science", "physic", "chem", "bio", "space", "astro", "math", "engineer", "nature", "climate"],
+    personas: ["a student who decided years ago they're 'not a science person'", "a curious adult who never got past the textbook", "a young tinkerer who learns with their hands"],
     artifacts: ["experiments", "models", "data", "phenomena", "predictions"],
     actions: [
       "run an experiment and watch it disagree with them",
@@ -1665,6 +1517,7 @@ const DOMAIN_PROFILES = [
   },
   {
     keywords: ["music", "art", "paint", "danc", "theat", "film", "design", "photo", "sculpt"],
+    personas: ["an adult who stopped making art in fourth grade", "a technically skilled student searching for a personal style", "a fan who wants to understand what they love"],
     artifacts: ["techniques", "styles", "materials", "compositions", "influences"],
     actions: [
       "study a master's choices from the inside",
@@ -1681,6 +1534,7 @@ const DOMAIN_PROFILES = [
 
 const GENERIC_PROFILE = {
   keywords: [],
+  personas: ["a curious newcomer to the subject", "a student meeting the topic for the first time", "an enthusiast ready to go deeper"],
   artifacts: ["core ideas", "real examples", "open questions", "turning points"],
   actions: [
     "explore the territory at their own pace",
@@ -1701,22 +1555,19 @@ function analyzeTopic(topic) {
   return GENERIC_PROFILE;
 }
 
-/* Composes a complete idea object (plain strings only — this is
-   exactly what gets stored when a user saves the experience). */
+/* The local generator: interprets the descriptions of the chosen
+   values and their categories, anchored to a concrete persona so
+   the result reads as a user story (who/where/why/what). */
 function composeIdea(topic, groups, profile) {
   const columnNames = Object.keys(groups);
   const columnByName = Object.fromEntries(taxonomy.columns.map((c) => [c.name, c]));
 
   const allCells = proseCells(columnNames.flatMap((c) => groups[c]));
   const signature = allCells.length > 0 ? pick(allCells).text : "Immersive";
+  const persona = pick(profile.personas);
 
-  // First chosen cell in a dimension (skipping "none"-style values)
   const cellOf = (col) => proseCells(groups[col] || [])[0] || null;
 
-  /* The heart of the smarter generator: the meaning of a chosen
-     value is its EDITED short description; the meaning of its
-     dimension is the category's short description. Both fall back
-     gracefully for custom content. */
   const valueMeaning = (col, fallback) => {
     const cell = cellOf(col);
     if (!cell) return fallback;
@@ -1741,36 +1592,27 @@ function composeIdea(topic, groups, profile) {
   ]);
 
   const pitch = pick([
-    `An immersive take on ${topic} where ${valueMeaning("Interactivity", "participants explore freely")} — set in ${profile.place}, built around ${naturalJoin(pickSome(profile.artifacts, 2))}.`,
-    `${capitalize(profile.place)} becomes the classroom: an experience about ${topic} in which ${valueMeaning("Interactivity", "participants set their own pace")}.`,
-    `A designed experience that turns ${topic} into a place — one where ${valueMeaning("Embodiment", "participants feel genuinely present")}, and ${naturalJoin(pickSome(profile.artifacts, 2))} are things you handle, not read about.`
+    `${capitalize(persona)} steps into ${profile.place} to experience ${topic} firsthand — an experience where ${valueMeaning("Interactivity", "they explore freely")}.`,
+    `An immersive take on ${topic}: ${persona} enters ${profile.place}, and ${naturalJoin(pickSome(profile.artifacts, 2))} become things to handle, not read about.`,
+    `${capitalize(profile.place)} becomes the classroom — ${persona} experiences ${topic} in a world where ${valueMeaning("Interactivity", "they set their own pace")}.`
   ]);
 
-  const audience = `${capitalize(valueMeaning("Co-Participation", "designed for solo or small-group participation"))}. ${capitalize(valueMeaning("Embodiment", "participants are present through their own natural perspective"))} — cast as ${pick([
-    "curious newcomers",
-    "hands-on apprentices",
-    "investigators with a real question",
-    "co-creators with a stake in the outcome"
-  ])} among ${profile.community}.`;
+  const audience = `Designed for ${persona} — and anyone like them. ${capitalize(valueMeaning("Co-Participation", "the experience works solo or in small groups"))}. ${capitalize(valueMeaning("Embodiment", "participants are present through their own natural perspective"))}.`;
 
   const storyCell = cellOf("Story");
   const flow =
-    `Arrival: participants step into ${profile.place}${storyCell ? ` — ${valueMeaning("Story", "")}` : ""}. ` +
-    `The core: they ${actionA}, then ${actionB}, while ${valueMeaning("Dynamics", "the experience responds to whatever they try")}. ` +
-    `Resolution: the session closes with ${profile.payoff}.`;
+    `Beginning: ${persona} arrives in ${profile.place} with a reason to be there — ${pick(["a question that needs answering", "a task only they can finish", "an invitation that felt impossible to refuse"])}${storyCell ? `, and ${valueMeaning("Story", "")}` : ""}. ` +
+    `Middle: they ${actionA}, then ${actionB}, while ${valueMeaning("Dynamics", "the experience responds to whatever they try")}. ` +
+    `End: the session resolves with ${profile.payoff} — and a clear moment that marks the experience as complete.`;
 
-  const interaction = `${capitalize(valueMeaning("Interactivity", "participants explore at their own pace"))}. In practice that means they ${actionA} — with ${valueMeaning("Motivation", "curiosity as the only incentive")}. ${pick([
-    `This is the layer that decides ${columnMeaning("Interactivity")}.`,
-    `Everything else in the design builds on this choice.`,
-    ""
-  ])}`.trim();
+  const interaction = `${capitalize(valueMeaning("Interactivity", "participants explore at their own pace"))}. In practice: they ${actionA} — with ${valueMeaning("Motivation", "curiosity as the only incentive")}.`;
 
   const immersion = `${capitalize(valueMeaning("Embodiment", "presence comes from attention to detail rather than hardware"))}. ${capitalize(valueMeaning("Meta Control", "the world stays in the designer's hands, so every moment can be tuned"))} — which keeps the immersion feeling ${pick(["earned", "personal", "alive", "coherent"])}.`;
 
-  const goal = `${capitalize(valueMeaning("Learning", "learning happens through doing"))}. The target: ${profile.payoff}. Emotionally, participants should leave feeling ${pick([
+  const goal = `${capitalize(valueMeaning("Learning", "learning happens through doing"))}. The target: ${profile.payoff}. Emotionally, ${persona.replace(/^an? /, "the ")} should leave feeling ${pick([
     "capable and curious for more",
     `personally connected to ${topic}`,
-    "like insiders rather than audience members",
+    "like an insider rather than an audience member",
     "that they made something worth keeping"
   ])}.`;
 
@@ -1786,7 +1628,6 @@ function composeIdea(topic, groups, profile) {
     "Delivery matches the design instead of driving it."
   ])}`;
 
-  /* Design rationale: category meaning + value meaning, per dimension */
   const rationale = columnNames.map((col) => {
     const cells = groups[col];
     const first = cells[0];
@@ -1812,156 +1653,169 @@ function composeIdea(topic, groups, profile) {
   return { title, pitch, audience, flow, interaction, immersion, goal, dataUse, techFit, rationale, expansion };
 }
 
-/* Renders a stored/fresh idea object to HTML (viewer for both the
-   main output and the library detail — content itself stays data) */
+/* Renders an idea object as a structured report (no emojis, no raw
+   dumps): pitch lead, a grid of section cards, rationale, and an
+   expansion callout. Also used by the library detail view. */
 function renderIdeaBody(idea, kind) {
-  const section = (icon, label, bodyHTML) =>
-    `<h3><span class="section-icon" aria-hidden="true">${icon}</span>${label}</h3>${bodyHTML}`;
+  const card = (label, body) =>
+    `<div class="report-card"><h3>${label}</h3><p>${escapeHTML(body)}</p></div>`;
 
   const rationaleHTML = `<ul>${(idea.rationale || [])
     .map(
       (r) =>
-        `<li><strong>${escapeHTML(r.col)}</strong> <span class="rationale-role">(${escapeHTML(r.colMeaning || "")})</span>: <em>${escapeHTML(naturalJoin(r.values))}</em> — ${escapeHTML(r.note)}.</li>`
+        `<li><strong>${escapeHTML(r.col)}</strong>${r.colMeaning ? ` <span class="rationale-role">(${escapeHTML(r.colMeaning)})</span>` : ""}: <em>${escapeHTML(naturalJoin(r.values))}</em> — ${escapeHTML(r.note)}.</li>`
     )
     .join("")}</ul>`;
 
+  /* Legacy "spark" items saved before this redesign still render */
   if (kind === "spark") {
-    const sparks = (idea.rationale || []).slice(0, 3).map(
-      (r) => `${capitalize(r.note)} (${r.col}: ${naturalJoin(r.values)}).`
-    );
     return `
-      ${section("⚡", "Pitch", `<p>${escapeHTML(idea.pitch)}</p>`)}
-      ${section("💭", "Sparks", `<ul>${sparks.map((s) => `<li>${escapeHTML(s)}</li>`).join("")}</ul>`)}
-      ${section("🚀", "If It Has Legs", `<p>${escapeHTML(idea.expansion)}</p>`)}
+      <p class="report-pitch">${escapeHTML(idea.pitch)}</p>
+      <div class="report-card"><h3>Sparks</h3>${rationaleHTML}</div>
+      <div class="report-card report-expansion"><h3>If It Has Legs</h3><p>${escapeHTML(idea.expansion)}</p></div>
     `;
   }
+
   return `
-    ${section("⚡", "Pitch", `<p>${escapeHTML(idea.pitch)}</p>`)}
-    ${section("👥", "Audience & Role", `<p>${escapeHTML(idea.audience)}</p>`)}
-    ${section("🗺️", "Experience Flow", `<p>${escapeHTML(idea.flow)}</p>`)}
-    ${section("🕹️", "Interaction Model", `<p>${escapeHTML(idea.interaction)}</p>`)}
-    ${section("🌊", "Immersion Strategy", `<p>${escapeHTML(idea.immersion)}</p>`)}
-    ${section("🎯", "Learning & Emotional Goal", `<p>${escapeHTML(idea.goal)}</p>`)}
-    ${section("📊", "Data & Personalization", `<p>${escapeHTML(idea.dataUse)}</p>`)}
-    ${section("🥽", "Technology Fit", `<p>${escapeHTML(idea.techFit)}</p>`)}
-    ${section("🧩", "Design Rationale", rationaleHTML)}
-    ${section("🚀", "Optional Expansion", `<p>${escapeHTML(idea.expansion)}</p>`)}
+    <p class="report-pitch">${escapeHTML(idea.pitch)}</p>
+    <div class="report-grid">
+      ${card("Audience & Role", idea.audience)}
+      ${card("Experience Flow", idea.flow)}
+      ${card("Interaction Model", idea.interaction)}
+      ${card("Immersion Strategy", idea.immersion)}
+      ${card("Learning & Emotional Goal", idea.goal)}
+      ${card("Data & Personalization", idea.dataUse)}
+      ${card("Technology Fit", idea.techFit)}
+    </div>
+    <div class="report-card report-rationale"><h3>Design Rationale</h3>${rationaleHTML}</div>
+    <div class="report-card report-expansion"><h3>Optional Expansion</h3><p>${escapeHTML(idea.expansion)}</p></div>
   `;
 }
 
-function generateIdea(kind) {
-  const topicRaw = $("topic-input").value.trim();
-  const groups = buildGroups();
+/* Basic shape check on whatever the AI returned */
+function isUsableIdea(idea) {
+  return idea && typeof idea.title === "string" && typeof idea.pitch === "string" && Array.isArray(idea.rationale);
+}
 
-  if (Object.keys(groups).length === 0) {
-    alert(
-      mode === "inspire"
-        ? "Roll a recipe first (press New Recipe)."
-        : "Select at least one cell first (or press Randomize Selection)."
-    );
+async function generateIdea() {
+  const topic = $("topic-input").value.trim();
+  const groups = buildGroups();
+  if (!topic || Object.keys(groups).length === 0) {
+    updateReadiness();
+    $("step-3").scrollIntoView({ behavior: "smooth" });
     return;
   }
 
-  const topic = topicRaw || "a topic of your choice";
-  const profile = analyzeTopic(topic);
-  const idea = composeIdea(topic, groups, profile);
-  lastGeneration = { kind, topic, idea, selections: captureSelections() };
+  const btn = $("generate-btn");
+  btn.disabled = true;
+  btn.textContent = "Generating…";
+
+  let idea = null;
+
+  // 1) Try the configured AI provider (ai-provider.js)…
+  if (aiAvailable()) {
+    try {
+      idea = await generateWithAI(buildAIContext(topic));
+      if (!isUsableIdea(idea)) idea = null;
+    } catch (err) {
+      console.warn("AI generation failed, using the local generator.", err);
+      idea = null;
+    }
+  }
+
+  // 2) …fall back to the built-in local generator.
+  if (!idea) {
+    idea = composeIdea(topic, groups, analyzeTopic(topic));
+  }
+
+  lastGeneration = { topic, idea, selections: captureSelections() };
 
   const chips = Object.keys(groups)
     .map((col) => `<span class="chip">${escapeHTML(col)} · ${escapeHTML(groups[col].map((cell) => cell.text).join(", "))}</span>`)
     .join("");
 
-  const output = $("idea-output");
-  output.innerHTML = `
+  $("idea-output").innerHTML = `
     <div class="recipe-chips">${chips}</div>
-    <h2>${escapeHTML(idea.title)}</h2>
-    ${renderIdeaBody(idea, kind)}
-    <div class="idea-actions" id="idea-actions"></div>
+    <h2 class="report-title">${escapeHTML(idea.title)}</h2>
+    ${renderIdeaBody(idea, "full")}
   `;
-  refreshSaveButton();
-  output.hidden = false;
-  output.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  renderIdeaActions();
+
+  btn.disabled = false;
+  btn.textContent = "Generate Experience";
+  $("step-4").hidden = false;
+  $("step-4").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-/* The Save button under a generated idea (signed-in users only) */
-function refreshSaveButton() {
+/* Step 4 actions: Save · New Variation · Start Over */
+function renderIdeaActions() {
   const holder = $("idea-actions");
   if (!holder) return;
   holder.innerHTML = "";
-  if (!cloud.configured || !lastGeneration) return;
-  const btn = document.createElement("button");
-  btn.id = "save-experience-btn";
-  btn.className = "btn btn-primary";
-  btn.type = "button";
-  btn.textContent = cloud.user ? "💾 Save Experience" : "💾 Sign in to save this experience";
-  btn.addEventListener("click", saveCurrentExperience);
-  holder.append(btn);
-}
+  if (!lastGeneration) return;
 
-function regenerate() {
-  generateIdea(lastGeneration?.kind || "full");
+  if (cloud.configured) {
+    const save = document.createElement("button");
+    save.id = "save-experience-btn";
+    save.className = "btn btn-primary";
+    save.type = "button";
+    save.textContent = cloud.user ? "Save Experience" : "Sign in to save this experience";
+    save.addEventListener("click", saveCurrentExperience);
+    holder.append(save);
+  }
+
+  const again = document.createElement("button");
+  again.className = "btn btn-brand";
+  again.type = "button";
+  again.title = "Same topic and decisions, a fresh interpretation";
+  again.textContent = "Generate New Variation";
+  again.addEventListener("click", generateIdea);
+  holder.append(again);
+
+  const over = document.createElement("button");
+  over.className = "btn btn-quiet";
+  over.type = "button";
+  over.title = "Clear the topic, selections, and result to begin again";
+  over.textContent = "Start Over";
+  over.addEventListener("click", startOver);
+  holder.append(over);
 }
 
 /* ------------------------------------------------------------
-   18. MODE SWITCHING + WIRING EVERYTHING UP
+   16. PAGE SETUP + WIRING EVERYTHING UP
    ------------------------------------------------------------ */
-const MODE_HINTS = {
-  edit: "Click any cell to edit its text; ✎ edits its description. ✎ beside a column name edits the category. Changes save automatically.",
-  idea: "Click cells to choose design elements — ⓘ shows what a value means without selecting it. Lock favorites, randomize the rest, then generate.",
-  inspire: "A complete experience recipe — one element per dimension. Lock favorites, reroll the rest, then generate."
-};
-
 function setMode(newMode) {
-  if (newMode === "edit" && !canEdit()) {
-    setMode("idea");
-    return;
-  }
+  if (newMode === "edit" && !canEdit()) newMode = "design";
   mode = newMode;
+  const editing = mode === "edit";
 
-  $("edit-mode-btn").classList.toggle("is-active", mode === "edit");
-  $("idea-mode-btn").classList.toggle("is-active", mode === "idea");
-  $("inspire-mode-btn").classList.toggle("is-active", mode === "inspire");
+  $("edit-mode-btn").textContent = editing ? "Done Editing" : "Edit Taxonomy";
+  $("edit-tools").hidden = !editing;
 
-  $("edit-tools").hidden = mode !== "edit";
-  $("idea-tools").hidden = mode !== "idea";
-  $("inspire-tools").hidden = mode !== "inspire";
+  // While editing, the guided steps step aside — only the grid matters
+  $("step-1").hidden = editing;
+  $("step-3").hidden = editing;
+  if (editing) $("step-4").hidden = true;
 
-  $("table-container").hidden = mode === "inspire";
-  $("recipe-board").hidden = mode !== "inspire";
+  renderTable();
+}
 
-  if (mode === "edit") $("idea-output").hidden = true;
-
-  const topicRow = $("topic-row");
-  if (mode === "idea") {
-    $("idea-topic-slot").append(topicRow);
-    topicRow.hidden = false;
-  } else if (mode === "inspire") {
-    $("inspire-topic-slot").append(topicRow);
-    topicRow.hidden = false;
-  } else {
-    topicRow.hidden = true;
-  }
-
-  $("mode-hint").textContent = MODE_HINTS[mode];
-
-  if (mode === "inspire") {
-    if (!recipe) newRecipe();
-    renderRecipeBoard();
-  } else {
-    renderTable();
-  }
-
-  const activeView = mode === "inspire" ? $("recipe-board") : $("table-container");
-  activeView.classList.remove("fade-in");
-  void activeView.offsetWidth;
-  activeView.classList.add("fade-in");
+/* Renders the walkthrough video iframe once a URL is configured */
+function setupVideo() {
+  if (!INTRO_VIDEO_EMBED_URL) return;   // keep the placeholder
+  const frame = $("video-frame");
+  frame.innerHTML = "";
+  const iframe = document.createElement("iframe");
+  iframe.src = INTRO_VIDEO_EMBED_URL;
+  iframe.title = "Taxonomy walkthrough video";
+  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+  iframe.allowFullscreen = true;
+  frame.append(iframe);
 }
 
 function init() {
-  // Mode switcher
-  $("edit-mode-btn").addEventListener("click", () => setMode("edit"));
-  $("idea-mode-btn").addEventListener("click", () => setMode("idea"));
-  $("inspire-mode-btn").addEventListener("click", () => setMode("inspire"));
+  // Header
+  $("edit-mode-btn").addEventListener("click", () => setMode(mode === "edit" ? "design" : "edit"));
 
   // Edit Mode
   $("add-row-btn").addEventListener("click", addRow);
@@ -1980,24 +1834,14 @@ function init() {
   });
   $("reset-btn").addEventListener("click", resetToDefault);
 
-  // Design Ideas Mode
-  $("gen-full-btn").addEventListener("click", () => generateIdea("full"));
-  $("gen-spark-btn").addEventListener("click", () => generateIdea("spark"));
-  $("regen-btn").addEventListener("click", regenerate);
-  $("random-path-btn").addEventListener("click", randomPath);
-  $("randomize-btn").addEventListener("click", randomizeSelection);
-  $("lock-selection-btn").addEventListener("click", toggleSelectionLock);
-  $("clear-btn").addEventListener("click", clearSelection);
-
-  // Inspiration Mode
-  $("inspire-full-btn").addEventListener("click", () => generateIdea("full"));
-  $("inspire-spark-btn").addEventListener("click", () => generateIdea("spark"));
-  $("inspire-regen-btn").addEventListener("click", regenerate);
-  $("new-recipe-btn").addEventListener("click", newRecipe);
-
+  // Guided workflow
+  $("topic-input").addEventListener("input", updateReadiness);
   $("topic-input").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") generateIdea("full");
+    if (e.key === "Enter" && !$("generate-btn").hidden) generateIdea();
   });
+  $("complete-random-btn").addEventListener("click", completeRandomly);
+  $("clear-btn").addEventListener("click", clearSelection);
+  $("generate-btn").addEventListener("click", generateIdea);
 
   // Description viewer + editor
   $("desc-modal-close").addEventListener("click", () => $("desc-modal").close());
@@ -2058,8 +1902,12 @@ function init() {
   $("lib-load").addEventListener("click", libraryLoad);
   $("lib-regen").addEventListener("click", libraryRegenerate);
 
+  // Footer + video
+  $("footer-copyright").textContent = `© ${new Date().getFullYear()} Ruscella Immersive. All rights reserved.`;
+  setupVideo();
+
   applyAccessControl();
-  setMode("idea");
+  setMode("design");
   if (!cloud.configured) {
     setSyncStatus("local", "Local mode — edits save in this browser only.");
   }
@@ -2068,8 +1916,7 @@ function init() {
 
 init();
 
-/* Debug/testing handle: lets the browser console inspect state,
-   e.g. TaxonomyApp.state().mode */
+/* Debug/testing handle for the browser console */
 window.TaxonomyApp = {
   state: () => ({
     mode,
@@ -2078,7 +1925,7 @@ window.TaxonomyApp = {
     columns: taxonomy.columns.map((c) => c.name),
     rows: taxonomy.rows.length,
     selected: selectedCells.size,
-    locked: lockedSelection.size
+    decided: decidedColumns()
   }),
   canEdit,
   isAdminUid

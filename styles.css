@@ -1,16 +1,15 @@
 /* ============================================================
-   Immersive Experience Design Taxonomy — styles.css
+   IXD — Immersive Experience Design Taxonomy — styles.css
 
-   Visual direction: modern education/technology aesthetic —
-   deep green branding, off-white content areas, rounded cards,
-   soft shadows, and occasional blue/purple gradient highlights.
-
-   All colors and shared sizes live in the CSS variables below,
-   so the whole theme can be tuned in one place.
+   Visual direction: a professional design methodology — deep
+   green branding, off-white content, generous whitespace,
+   rounded cards, soft shadows, and blue/purple used sparingly
+   as the action color. The whole theme lives in the variables
+   below.
    ============================================================ */
 
 :root {
-  /* Brand greens (header, footer, accents) */
+  /* Brand greens */
   --green-950: #0a1f19;
   --green-900: #0f2e25;
   --green-800: #14402f;
@@ -18,14 +17,14 @@
   --green-100: #ddefe6;
 
   /* Content surfaces */
-  --bg: #f6f5f1;            /* off-white page background */
-  --surface: #ffffff;       /* cards */
-  --cell: #f1f3ee;          /* taxonomy cell chips */
-  --ink: #17241f;           /* main text */
-  --ink-soft: #5c6b64;      /* secondary text */
-  --line: #e4e7e1;          /* hairline borders */
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --cell: #f4f5f1;
+  --ink: #17241f;
+  --ink-soft: #5c6b64;
+  --line: #e6e8e2;
 
-  /* Gradient highlight (blue → purple) used for primary actions */
+  /* Purple accent — actions, selection, focus */
   --grad-a: #4f46e5;
   --grad-b: #9333ea;
   --gradient: linear-gradient(135deg, var(--grad-a), var(--grad-b));
@@ -33,17 +32,14 @@
 
   --danger: #c0392b;
 
-  /* Shape + shadow */
   --radius: 14px;
   --radius-sm: 10px;
-  --shadow: 0 1px 2px rgba(16, 32, 25, 0.06), 0 8px 24px rgba(16, 32, 25, 0.07);
+  --shadow: 0 1px 2px rgba(16, 32, 25, 0.05), 0 8px 24px rgba(16, 32, 25, 0.06);
   --shadow-lift: 0 2px 4px rgba(16, 32, 25, 0.08), 0 12px 32px rgba(16, 32, 25, 0.12);
 }
 
 * { box-sizing: border-box; }
 
-/* Elements with the `hidden` attribute must stay hidden even when
-   another rule gives them display:flex/grid. */
 [hidden] { display: none !important; }
 
 html { scroll-behavior: smooth; }
@@ -51,7 +47,7 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 16.5px;              /* comfortable base — no tiny UI text */
+  font-size: 16.5px;
   background: var(--bg);
   color: var(--ink);
   line-height: 1.6;
@@ -60,14 +56,18 @@ body {
 main {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 0 24px 80px;
+  padding: 0 24px 40px;
 }
 
-/* Re-applied by script.js on every mode switch to fade the workspace in */
 .fade-in { animation: rise 0.25s ease both; }
 
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ------------------------------------------------------------
-   Site header — dark green brand bar
+   Site header
    ------------------------------------------------------------ */
 .site-header {
   background: linear-gradient(120deg, var(--green-950), var(--green-800));
@@ -94,677 +94,29 @@ main {
   align-items: center;
   gap: 10px;
   font-weight: 700;
-  letter-spacing: 0.01em;
 }
 
-/* Small round monogram, a nod to clean studio branding */
 .brand-mark {
   display: inline-grid;
   place-items: center;
-  width: 34px;
   height: 34px;
-  border-radius: 50%;
+  padding: 0 10px;
+  border-radius: 9px;
   background: var(--gradient);
-  font-size: 0.85rem;
-  font-weight: 800;
-}
-
-.brand-name { font-size: 1.02rem; }
-
-/* Mode switcher — segmented pill on the dark header */
-.mode-toggle {
-  display: inline-flex;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  padding: 4px;
-}
-
-.mode-btn {
-  border: none;
-  background: transparent;
-  padding: 8px 16px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--green-100);
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.mode-btn:hover { background: rgba(255, 255, 255, 0.1); }
-
-.mode-btn.is-active {
-  background: #fff;
-  color: var(--green-800);
-}
-
-/* ------------------------------------------------------------
-   Hero
-   ------------------------------------------------------------ */
-.hero {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: 72px 24px 48px;
-  text-align: center;
-  /* Very subtle green tint radiating from the header */
-  background: radial-gradient(ellipse 90% 70% at 50% 0%, rgba(27, 87, 65, 0.05), transparent);
-}
-
-.hero-eyebrow {
-  margin: 0 0 10px;
   font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--green-700);
+  font-weight: 800;
+  letter-spacing: 0.06em;
 }
 
-.hero h1 {
-  margin: 0 0 14px;
-  font-size: clamp(1.9rem, 4.5vw, 2.8rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-}
+.brand-name { font-size: 1rem; }
 
-/* Blue→purple gradient text highlight */
-.gradient-text {
-  background: var(--gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.hero-sub {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 1.05rem;
-}
-
-/* ------------------------------------------------------------
-   Panels (mode toolbars)
-   ------------------------------------------------------------ */
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 20px 22px;
-  margin-bottom: 22px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  animation: rise 0.3s ease both;   /* soft entrance on mode switch */
-}
-
-.panel-stack { flex-direction: column; align-items: stretch; }
-
-@keyframes rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.toolbar-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.panel-note {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 0.85rem;
-}
-
-.mode-hint {
-  color: var(--ink-soft);
-  font-size: 0.9rem;
-  margin: 0 0 12px 6px;
-}
-
-/* ------------------------------------------------------------
-   Buttons
-   ------------------------------------------------------------ */
-.btn {
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--ink);
-  padding: 11px 18px;
-  border-radius: 12px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease,
-              transform 0.15s ease, box-shadow 0.2s ease;
-}
-
-.btn:hover {
-  border-color: var(--green-700);
-  background: var(--green-100);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
-}
-
-.btn:active { transform: translateY(0) scale(0.97); }
-
-/* Primary — blue/purple gradient */
-.btn-primary {
-  background: var(--gradient);
-  border-color: transparent;
-  color: #fff;
-}
-.btn-primary:hover {
-  background: var(--gradient);
-  color: #fff;
-  filter: brightness(1.08);
-  box-shadow: var(--shadow-lift);
-}
-
-/* Brand — deep green */
-.btn-brand {
-  background: var(--green-800);
-  border-color: var(--green-800);
-  color: #fff;
-}
-.btn-brand:hover { background: var(--green-700); color: #fff; }
-
-.btn-danger { color: var(--danger); }
-.btn-danger:hover { background: #fdecea; border-color: var(--danger); }
-
-/* "Saved ✓" feedback text next to the Save button */
-.save-status {
-  color: var(--green-700);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-/* Topic input */
-.topic-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.topic-label { font-weight: 700; font-size: 0.9rem; }
-
-#topic-input {
-  flex: 1;
-  padding: 11px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-family: inherit;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-#topic-input:focus {
-  outline: none;
-  border-color: var(--grad-a);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
-}
-
-/* ------------------------------------------------------------
-   The workspace — taxonomy grid
-   Cells are rounded chips with spacing between them, so the
-   framework reads as a card grid rather than a spreadsheet.
-   ------------------------------------------------------------ */
-.workspace {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 18px;
-}
-
-.table-wrap { overflow-x: auto; }   /* horizontal scroll on small screens */
-
-table {
-  border-collapse: separate;
-  border-spacing: 6px;
-  width: 100%;
-  min-width: 980px;                 /* keeps 10 columns readable; wrapper scrolls */
-  font-size: 0.88rem;
-}
-
-th, td {
-  padding: 12px 14px;
-  text-align: left;
-  min-width: 92px;
-  border-radius: var(--radius-sm);
-}
-
-/* Column headers — deep green chips */
-thead th {
-  background: var(--green-800);
-  color: var(--green-100);
-  font-weight: 700;
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* Body cells — soft chips */
-tbody td {
-  background: var(--cell);
-  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
-}
-
-/* --- Edit Mode --- */
-[contenteditable="true"] {
-  outline: none;
-  cursor: text;
-  min-height: 1em;
-}
-
-[contenteditable="true"]:focus {
-  background: #fff;
-  box-shadow: inset 0 0 0 2px var(--grad-a);
-}
-
-/* Small × buttons for deleting a row/column */
-.delete-btn {
-  border: none;
-  background: transparent;
-  color: inherit;
-  opacity: 0.55;
-  font-size: 0.95rem;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
-  line-height: 1;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-
-.delete-btn:hover { opacity: 1; background: #fdecea; color: var(--danger); }
-
-/* Header cells hold the editable name plus the delete button */
-.header-cell {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.header-name { flex: 1; }
-
-/* Narrow trailing column that holds row-delete buttons */
-.row-tools {
-  width: 38px;
-  min-width: 38px;
-  text-align: center;
-  background: transparent !important;
-}
-
-/* --- Design Ideas Mode --- */
-.selectable {
-  cursor: pointer;
-  user-select: none;
-}
-
-.selectable:hover {
-  background: var(--grad-soft);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
-}
-
-.selectable.is-selected {
-  background: var(--grad-soft);
-  box-shadow: inset 0 0 0 2px var(--grad-a);
-  font-weight: 700;
-  color: var(--grad-a);
-  animation: pop 0.25s ease;   /* gentle settle when a cell is chosen */
-}
-
-@keyframes pop {
-  0%   { transform: scale(0.94); }
-  60%  { transform: scale(1.03); }
-  100% { transform: scale(1); }
-}
-
-/* Locked selections (protected from Randomize) read as green — the
-   brand color — instead of the purple used for ordinary selections */
-.selectable.is-locked-cell {
-  background: var(--green-100);
-  box-shadow: inset 0 0 0 2px var(--green-700);
-  color: var(--green-800);
-}
-
-.selectable.is-locked-cell::after {
-  content: " 🔒";
-  font-size: 0.75em;
-}
-
-/* ------------------------------------------------------------
-   Inspiration Mode — the recipe board
-   One card per taxonomy column, each holding a randomly chosen
-   value with reroll + lock controls.
-   ------------------------------------------------------------ */
-.recipe-board {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.recipe-card {
-  background: var(--cell);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  animation: rise 0.3s ease both;
-  transition: box-shadow 0.2s ease, transform 0.12s ease, background 0.2s ease;
-}
-
-.recipe-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
-
-/* Locked cards get a green treatment so they stand out */
-.recipe-card.is-locked {
-  background: var(--green-100);
-  border-color: var(--green-700);
-}
-
-.recipe-dimension {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--green-700);
-}
-
-.recipe-value {
-  font-size: 1rem;
-  font-weight: 700;
-  min-height: 2.6em;   /* keeps cards even when values wrap */
-}
-
-.recipe-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.icon-btn {
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 8px;
-  padding: 4px 8px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-.icon-btn:hover { border-color: var(--green-700); transform: translateY(-1px); }
-.icon-btn:active { transform: scale(0.94); }
-
-/* ------------------------------------------------------------
-   Generated idea — polished report card
-   ------------------------------------------------------------ */
-.idea-output {
-  margin-top: 30px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lift);
-  padding: 28px 32px;
-  animation: rise 0.35s ease both;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Gradient ribbon along the top edge of the report */
-.idea-output::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 5px;
-  background: var(--gradient);
-}
-
-.idea-output h2 {
-  margin: 4px 0 12px;
-  font-size: 1.5rem;
-  letter-spacing: -0.015em;
-}
-
-.idea-output h3 {
+.header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 24px 0 5px;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--green-700);
 }
 
-.section-icon { font-size: 1.05rem; }
-
-.idea-output p { margin: 0; }
-
-.idea-output ul { margin: 4px 0 0; padding-left: 20px; }
-.idea-output li { margin-bottom: 5px; }
-
-/* Row of "Column · Value" chips summarizing the recipe used */
-.recipe-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.chip {
-  background: var(--grad-soft);
-  border: 1px solid #ddd9f8;
-  color: var(--grad-a);
-  border-radius: 999px;
-  padding: 3px 12px;
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-/* ------------------------------------------------------------
-   Clickable column headers (Idea/Inspiration modes)
-   The ⓘ icon + hover lift make it obvious headers open info.
-   ------------------------------------------------------------ */
-.th-info {
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.2s ease, transform 0.15s ease;
-}
-
-.th-info:hover,
-.th-info:focus-visible {
-  background: var(--green-700);
-  transform: translateY(-1px);
-}
-
-.th-info:focus-visible {
-  outline: 2px solid var(--grad-a);
-  outline-offset: 2px;
-}
-
-.info-icon {
-  opacity: 0.75;
-  font-size: 0.9em;
-  font-weight: 400;
-}
-
-/* Recipe card dimension name doubles as an info button */
-.recipe-dimension-btn {
-  border: none;
-  background: transparent;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--green-700);
-}
-
-.recipe-dimension-btn:hover { text-decoration: underline; }
-
-/* ------------------------------------------------------------
-   Dialogs (description modal, category editor, admin sign-in)
-   ------------------------------------------------------------ */
-.modal {
-  border: none;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lift);
-  padding: 26px 28px;
-  width: min(560px, calc(100vw - 32px));
-  color: var(--ink);
-}
-
-.modal::backdrop {
-  background: rgba(10, 31, 25, 0.45);
-  backdrop-filter: blur(2px);
-}
-
-.modal[open] { animation: rise 0.22s ease both; }
-
-.modal-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-
-.modal-head h2 {
-  margin: 0;
-  font-size: 1.3rem;
-  letter-spacing: -0.01em;
-}
-
-.modal-close {
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.modal-close:hover { background: #fdecea; border-color: var(--danger); }
-
-.modal-lead {
-  margin: 0 0 4px;
-  font-size: 1.02rem;
-  font-weight: 600;
-  color: var(--green-800);
-}
-
-.modal h3 {
-  margin: 18px 0 4px;
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--green-700);
-}
-
-.modal p { margin: 0; }
-
-/* Form fields inside the editor + login dialogs */
-.field {
-  display: block;
-  margin: 14px 0 0;
-}
-
-.field span {
-  display: block;
-  font-weight: 700;
-  font-size: 0.88rem;
-  margin-bottom: 4px;
-}
-
-.field small { font-weight: 400; color: var(--ink-soft); }
-
-.field input,
-.field textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-family: inherit;
-  resize: vertical;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.field input:focus,
-.field textarea:focus {
-  outline: none;
-  border-color: var(--grad-a);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
-}
-
-.modal-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.login-error {
-  margin: 12px 0 0;
-  color: var(--danger);
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-/* ------------------------------------------------------------
-   Cloud save status + backup tools (Edit mode)
-   ------------------------------------------------------------ */
-.toolbar-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.cloud-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-.sync-status {
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.sync-status.is-ok      { color: var(--green-700); }
-.sync-status.is-info    { color: var(--ink-soft); }
-.sync-status.is-local   { color: var(--ink-soft); }
-.sync-status.is-pending { color: #b45309; }
-.sync-status.is-error   { color: var(--danger); }
-
-.backup-tools {
-  border-top: 1px solid var(--line);
-  padding-top: 10px;
-}
-
-.backup-tools summary {
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 0.88rem;
-  color: var(--ink-soft);
-}
-
-.backup-tools summary:hover { color: var(--ink); }
-
-.backup-tools .toolbar-group { margin-top: 12px; }
-
-/* ------------------------------------------------------------
-   Header account controls (upper right)
-   ------------------------------------------------------------ */
+/* Account controls (upper right) */
 .account-area { display: flex; align-items: center; gap: 8px; }
 
 #auth-buttons { display: flex; gap: 8px; }
@@ -786,11 +138,19 @@ tbody td {
 
 .account-btn:hover { background: rgba(255, 255, 255, 0.18); transform: translateY(-1px); }
 
-.account-btn-solid {
-  background: var(--gradient);
-  border-color: transparent;
-}
+.account-btn-solid { background: var(--gradient); border-color: transparent; }
 .account-btn-solid:hover { filter: brightness(1.1); }
+
+.account-initial {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gradient);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
 
 .account-menu-wrap { position: relative; }
 
@@ -832,41 +192,339 @@ tbody td {
 
 .account-dropdown button:hover { background: var(--green-100); }
 
-.auth-info {
-  margin: 12px 0 0;
-  color: var(--green-700);
-  font-size: 0.88rem;
-  font-weight: 600;
+/* ------------------------------------------------------------
+   Hero + introduction + video
+   ------------------------------------------------------------ */
+.hero {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 72px 24px 40px;
+  text-align: center;
+  background: radial-gradient(ellipse 90% 70% at 50% 0%, rgba(27, 87, 65, 0.05), transparent);
 }
 
-.auth-links {
+.hero-eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--green-700);
+}
+
+.hero h1 {
+  margin: 0 0 14px;
+  font-size: clamp(1.9rem, 4.5vw, 2.8rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.gradient-text {
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-sub {
+  margin: 0 0 24px;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+}
+
+.hero-cta { display: inline-block; text-decoration: none; }
+
+.intro {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 8px 24px 8px;
+}
+
+.intro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.intro-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+}
+
+.intro-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green-700);
+}
+
+.intro-card p { margin: 0; font-size: 0.95rem; color: var(--ink-soft); }
+.intro-card em { color: var(--ink); font-style: italic; }
+
+.video-section {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 48px 24px 24px;
+  text-align: center;
+}
+
+.video-section h2 { margin: 0 0 6px; font-size: 1.5rem; letter-spacing: -0.01em; }
+
+.section-sub { margin: 0 0 18px; color: var(--ink-soft); font-size: 0.95rem; }
+
+.video-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-lift);
+  background: var(--green-900);
+}
+
+.video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  color: var(--green-100);
+}
+
+.video-placeholder p { margin: 0; font-weight: 600; }
+
+.video-placeholder-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 1.4rem;
+}
+
+/* ------------------------------------------------------------
+   Guided steps
+   ------------------------------------------------------------ */
+.step-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 30px;
+  margin: 26px 0;
+  scroll-margin-top: 90px;   /* clears the sticky header on anchor jumps */
+}
+
+.step-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.step-head h2 { margin: 2px 0 4px; font-size: 1.35rem; letter-spacing: -0.01em; }
+.step-head .section-sub { margin-bottom: 0; }
+
+.step-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--green-800);
+  color: var(--green-100);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.step-footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
-  margin: 16px 0 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
 }
 
-.link-btn {
-  border: none;
-  background: transparent;
-  color: var(--grad-a);
-  font: inherit;
-  font-size: 0.86rem;
+.inline-info {
+  display: inline-grid;
+  place-items: center;
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 0.75em;
+  font-weight: 700;
+  font-style: normal;
+  vertical-align: 0.1em;
+}
+
+/* Step 3 readiness */
+.readiness {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+.readiness.is-ready { color: var(--green-700); font-weight: 600; }
+
+/* ------------------------------------------------------------
+   Panels (edit toolbar) + shared bits
+   ------------------------------------------------------------ */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+  margin: 26px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  animation: rise 0.3s ease both;
+}
+
+.panel-stack { flex-direction: column; align-items: stretch; }
+
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toolbar-group { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.panel-note { margin: 0; color: var(--ink-soft); font-size: 0.88rem; }
+
+/* ------------------------------------------------------------
+   Buttons
+   ------------------------------------------------------------ */
+.btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  padding: 11px 18px;
+  border-radius: 12px;
+  font-size: 0.95rem;
   font-weight: 600;
-  text-decoration: underline;
   cursor: pointer;
-  padding: 0;
+  transition: background 0.2s ease, border-color 0.2s ease,
+              transform 0.15s ease, box-shadow 0.2s ease;
 }
 
-.link-btn:hover { color: var(--grad-b); }
+.btn:hover {
+  border-color: var(--green-700);
+  background: var(--green-100);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.btn:active { transform: translateY(0) scale(0.97); }
+
+.btn-primary {
+  background: var(--gradient);
+  border-color: transparent;
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--gradient);
+  color: #fff;
+  filter: brightness(1.08);
+  box-shadow: var(--shadow-lift);
+}
+
+.btn-brand {
+  background: var(--green-800);
+  border-color: var(--green-800);
+  color: #fff;
+}
+.btn-brand:hover { background: var(--green-700); color: #fff; }
+
+.btn-danger { color: var(--danger); }
+.btn-danger:hover { background: #fdecea; border-color: var(--danger); }
+
+/* Quiet buttons for secondary/low-emphasis actions */
+.btn-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-soft);
+}
+.btn-quiet:hover { background: var(--cell); border-color: var(--line); color: var(--ink); }
+
+.btn-large {
+  padding: 15px 32px;
+  font-size: 1.05rem;
+  border-radius: 14px;
+}
+
+/* Sync status (edit mode) */
+.cloud-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sync-status { font-size: 0.88rem; font-weight: 600; }
+.sync-status.is-ok      { color: var(--green-700); }
+.sync-status.is-info    { color: var(--ink-soft); }
+.sync-status.is-local   { color: var(--ink-soft); }
+.sync-status.is-pending { color: #b45309; }
+.sync-status.is-error   { color: var(--danger); }
+
+.save-status { color: var(--green-700); font-size: 0.85rem; font-weight: 700; }
+
+.backup-tools { border-top: 1px solid var(--line); padding-top: 10px; }
+.backup-tools summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+.backup-tools summary:hover { color: var(--ink); }
+.backup-tools .toolbar-group { margin-top: 12px; }
+
+/* Topic input */
+.topic-row { display: flex; align-items: center; gap: 10px; }
+
+#topic-input {
+  flex: 1;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#topic-input:focus {
+  outline: none;
+  border-color: var(--grad-a);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
 
 /* ------------------------------------------------------------
    Taxonomy search
    ------------------------------------------------------------ */
-.search-bar {
-  position: relative;
-  margin-bottom: 14px;
-}
+.search-bar { position: relative; margin-bottom: 16px; }
 
 #search-input {
   width: 100%;
@@ -875,13 +533,13 @@ tbody td {
   border-radius: 12px;
   font-size: 0.95rem;
   font-family: inherit;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--cell);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 #search-input:focus {
   outline: none;
+  background: #fff;
   border-color: var(--grad-a);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
 }
@@ -915,7 +573,6 @@ tbody td {
 }
 
 .search-result:hover, .search-result:focus-visible { background: var(--grad-soft); }
-
 .search-result strong { display: block; font-size: 0.95rem; }
 .search-result small { color: var(--ink-soft); font-size: 0.8rem; }
 
@@ -931,32 +588,146 @@ tbody td {
 .search-empty { margin: 8px 12px; color: var(--ink-soft); font-size: 0.88rem; }
 
 /* ------------------------------------------------------------
-   Value cells: text + tiny ⓘ/✎ button
+   The taxonomy — a design rubric, not a spreadsheet.
+   Columns are decisions; cells are open, borderless options that
+   read as choices. Selection is unmistakable.
    ------------------------------------------------------------ */
+.workspace { padding: 4px 0; }
+
+.table-wrap { overflow-x: auto; }
+
+table {
+  border-collapse: separate;
+  border-spacing: 8px 6px;
+  width: 100%;
+  min-width: 1020px;
+  font-size: 0.88rem;
+}
+
+th, td {
+  padding: 12px 14px;
+  text-align: left;
+  min-width: 96px;
+  border-radius: var(--radius-sm);
+}
+
+/* Column headers: each one is a numbered design decision */
+thead th {
+  background: var(--green-800);
+  color: var(--green-100);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  vertical-align: top;
+}
+
+.th-decision {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.65;
+  margin-bottom: 2px;
+}
+
+.th-label { text-transform: uppercase; }
+
+.th-info {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.th-info:hover, .th-info:focus-visible {
+  background: var(--green-700);
+  transform: translateY(-1px);
+}
+
+.th-info:focus-visible { outline: 2px solid var(--grad-a); outline-offset: 2px; }
+
+/* Value cells: light, airy, no heavy borders */
+tbody td {
+  background: var(--cell);
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease,
+              box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+.selectable { cursor: pointer; user-select: none; }
+
+.selectable:hover {
+  background: #fff;
+  border-color: var(--line);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+/* Selection is the strongest visual state on the page */
+.selectable.is-selected {
+  background: var(--grad-soft);
+  border-color: var(--grad-a);
+  box-shadow: 0 0 0 1px var(--grad-a), var(--shadow);
+  font-weight: 700;
+  color: var(--grad-a);
+  animation: pop 0.25s ease;
+}
+
+.selectable.is-selected::after {
+  content: "✓";
+  float: right;
+  font-size: 0.85em;
+  margin-left: 6px;
+}
+
+@keyframes pop {
+  0%   { transform: scale(0.94); }
+  60%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+/* The small i / ✎ buttons inside cells */
 td .cell-text { display: inline; }
 
 .cell-info-btn {
-  border: none;
-  background: transparent;
+  border: 1px solid var(--line);
+  background: #fff;
   color: var(--ink-soft);
-  font-size: 0.8rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-style: italic;
+  font-family: Georgia, serif;
   cursor: pointer;
-  padding: 1px 5px;
-  margin-left: 4px;
-  border-radius: 6px;
-  opacity: 0.6;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  margin-left: 6px;
+  border-radius: 50%;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
-.cell-info-btn:hover { background: var(--grad-soft); color: var(--grad-a); }
-
+.cell-info-btn:hover { background: var(--grad-soft); color: var(--grad-a); border-color: var(--grad-a); }
 .selectable.is-selected .cell-info-btn { color: var(--grad-a); }
 
+/* Edit-mode grid controls */
+[contenteditable="true"] { outline: none; cursor: text; min-height: 1em; }
+
+.header-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.header-name { flex: 1; }
+.header-name:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
 .edit-cell .cell-text {
-  outline: none;
-  cursor: text;
-  min-height: 1em;
   display: inline-block;
   min-width: 40px;
 }
@@ -967,26 +738,159 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   border-radius: 4px;
 }
 
-/* Recipe card value doubles as an info button */
-.recipe-value-btn {
+.delete-btn {
   border: none;
   background: transparent;
-  padding: 0;
-  text-align: left;
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  min-height: 2.6em;
   color: inherit;
+  opacity: 0.55;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
-.recipe-value-btn:hover { color: var(--grad-a); text-decoration: underline dotted; }
+.delete-btn:hover { opacity: 1; background: #fdecea; color: var(--danger); }
+
+.row-tools {
+  width: 38px;
+  min-width: 38px;
+  text-align: center;
+  background: transparent !important;
+}
 
 /* ------------------------------------------------------------
-   Saved experiences library
+   The generated experience — a structured report
    ------------------------------------------------------------ */
+.recipe-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.chip {
+  background: var(--grad-soft);
+  border: 1px solid #ddd9f8;
+  color: var(--grad-a);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.report-title {
+  margin: 4px 0 10px;
+  font-size: 1.6rem;
+  letter-spacing: -0.015em;
+}
+
+.report-pitch {
+  margin: 0 0 20px;
+  font-size: 1.08rem;
+  line-height: 1.55;
+  color: var(--ink);
+  border-left: 4px solid var(--grad-a);
+  padding-left: 16px;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.report-card {
+  background: var(--cell);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 18px 20px;
+}
+
+.report-card h3 {
+  margin: 0 0 6px;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green-700);
+}
+
+.report-card p { margin: 0; font-size: 0.94rem; }
+.report-card ul { margin: 4px 0 0; padding-left: 20px; font-size: 0.94rem; }
+.report-card li { margin-bottom: 5px; }
+
+.report-rationale { margin-bottom: 14px; }
+
+.report-expansion {
+  background: var(--grad-soft);
+  border-color: #ddd9f8;
+}
+
+.rationale-role { color: var(--ink-soft); font-size: 0.86em; }
+
+.idea-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ------------------------------------------------------------
+   Book placeholder + footer
+   ------------------------------------------------------------ */
+.book-section {
+  text-align: center;
+  padding: 32px 24px 8px;
+}
+
+.book-section h2 { margin: 0 0 6px; font-size: 1.4rem; letter-spacing: -0.01em; }
+
+.site-footer {
+  background: var(--green-950);
+  color: var(--green-100);
+  text-align: center;
+  padding: 30px 24px;
+  font-size: 0.82rem;
+  margin-top: 40px;
+}
+
+.site-footer p { margin: 4px 0; opacity: 0.85; }
+.footer-brand { font-weight: 700; font-size: 0.9rem; opacity: 1 !important; }
+.site-footer a { color: var(--green-100); }
+.site-footer a:hover { color: #fff; }
+
+/* ------------------------------------------------------------
+   Dialogs
+   ------------------------------------------------------------ */
+.modal {
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  padding: 26px 28px;
+  width: min(560px, calc(100vw - 32px));
+  color: var(--ink);
+}
+
+.modal::backdrop {
+  background: rgba(10, 31, 25, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal[open] { animation: rise 0.22s ease both; }
+
 .modal-wide { width: min(760px, calc(100vw - 32px)); }
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.modal-head h2 { margin: 0; font-size: 1.3rem; letter-spacing: -0.01em; }
 
 .modal-context {
   margin: 0;
@@ -997,6 +901,105 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   color: var(--green-700);
 }
 
+.modal-close {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-close:hover { background: #fdecea; border-color: var(--danger); }
+
+.modal-lead {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: var(--green-800);
+}
+
+.modal h3 {
+  margin: 18px 0 4px;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green-700);
+}
+
+.modal p { margin: 0; }
+
+.field { display: block; margin: 14px 0 0; }
+
+.field span {
+  display: block;
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-bottom: 4px;
+}
+
+.field small { font-weight: 400; color: var(--ink-soft); }
+
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--grad-a);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
+
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+.login-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.auth-info {
+  margin: 12px 0 0;
+  color: var(--green-700);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 16px 0 0;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  color: var(--grad-a);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-btn:hover { color: var(--grad-b); }
+
+/* ------------------------------------------------------------
+   Saved experiences library
+   ------------------------------------------------------------ */
 .library-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1050,12 +1053,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 .lib-item-main strong { display: block; font-size: 0.95rem; }
 .lib-item-main small { color: var(--ink-soft); font-size: 0.8rem; }
 
-.lib-detail-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 14px 0 4px;
-}
+.lib-detail-head { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; }
 
 .lib-title-input {
   flex: 1;
@@ -1067,53 +1065,38 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   border-radius: 10px;
 }
 
+.icon-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-btn:hover { border-color: var(--green-700); transform: translateY(-1px); }
+
 .lib-fav-btn { font-size: 1.2rem; color: #d97706; }
 
 .lib-actions { margin: 14px 0; }
 
-.lib-content {
-  border-top: 1px solid var(--line);
-  padding-top: 4px;
-}
-
-.lib-content h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Save button under a generated idea */
-.idea-actions { margin-top: 22px; }
-
-.rationale-role { color: var(--ink-soft); font-size: 0.86em; }
-
-/* ------------------------------------------------------------
-   Footer
-   ------------------------------------------------------------ */
-.site-footer {
-  background: var(--green-950);
-  color: var(--green-100);
-  text-align: center;
-  padding: 26px 24px;
-  font-size: 0.82rem;
-}
-
-.site-footer p { margin: 4px 0; opacity: 0.85; }
+.lib-content { border-top: 1px solid var(--line); padding-top: 14px; }
 
 /* ------------------------------------------------------------
    Responsiveness
    ------------------------------------------------------------ */
 @media (max-width: 720px) {
   .header-inner { justify-content: center; }
-  .hero { padding-top: 36px; }
+  .hero { padding-top: 40px; }
   .topic-row { flex-direction: column; align-items: stretch; }
-  th, td { padding: 8px 9px; }
-  .idea-output { padding: 22px 20px; }
+  th, td { padding: 9px 10px; }
+  .step-card { padding: 20px 18px; }
+  .step-head { gap: 12px; }
 
-  /* Compact account controls on small screens: the dropdown keeps
-     Saved Experiences + Sign Out reachable, the name is hidden */
   .account-name { display: none; }
   .account-btn { padding: 8px 10px; }
   .library-controls { flex-direction: column; align-items: stretch; }
   .lib-actions .btn { flex: 1; }
+  .idea-actions .btn { flex: 1; }
 }
