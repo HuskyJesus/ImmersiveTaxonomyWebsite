@@ -205,7 +205,8 @@ const cloud = {
   revision: null,
   dirty: false,
   saveTimer: null,
-  saving: false
+  saving: false,
+  savePending: false
 };
 
 /* ------------------------------------------------------------
@@ -524,12 +525,39 @@ function scheduleCloudSave() {
 }
 
 async function saveToCloud() {
-  if (!cloud.configured || !cloud.user || cloud.saving) return;
+  if (!cloud.configured || !cloud.user) return;
+  if (cloud.saving) {
+    // A save is already in flight — remember to run again so edits
+    // made during the upload are not silently dropped.
+    cloud.savePending = true;
+    return;
+  }
   cloud.saving = true;
   setSyncStatus("info", "Saving…");
   try {
     const { doc, setDoc, serverTimestamp, getDoc } = cloud.fns;
     const ref = doc(cloud.db, ...CLOUD_DOC_PATH);
+
+    // Conflict guard: if another admin saved a newer version since
+    // this browser last loaded it, do not silently overwrite it.
+    const existing = await getDoc(ref);
+    const remoteRevision = existing.exists() ? existing.data()?.updatedAt?.toMillis?.() ?? null : null;
+    if (remoteRevision && cloud.revision && remoteRevision > cloud.revision) {
+      const overwrite = confirm(
+        "The cloud taxonomy was updated by another administrator after this browser loaded it " +
+        `(cloud version: ${new Date(remoteRevision).toLocaleString()}).\n\n` +
+        "OK = overwrite it with the version on this screen\n" +
+        "Cancel = keep your edits unsaved here (use Restore Cloud Version to review theirs first)"
+      );
+      if (!overwrite) {
+        cloud.saving = false;
+        cloud.savePending = false;
+        setSyncStatus("pending", "Not saved — a newer cloud version exists. Your edits are kept in this browser.");
+        $("retry-save-btn").hidden = false;
+        return;
+      }
+    }
+
     await setDoc(ref, {
       ...serializeForCloud(),
       updatedAt: serverTimestamp(),
@@ -537,7 +565,11 @@ async function saveToCloud() {
     });
     const snap = await getDoc(ref);
     cloud.revision = snap.data()?.updatedAt?.toMillis?.() ?? Date.now();
-    cloud.dirty = false;
+    // Edits made while this save was uploading still need saving —
+    // only report "all saved" when nothing is pending.
+    if (!cloud.savePending) {
+      cloud.dirty = false;
+    }
     saveLocal();
     setSyncStatus("ok", "All changes saved");
     updateLastSaved(cloud.revision);
@@ -554,6 +586,10 @@ async function saveToCloud() {
     $("retry-save-btn").hidden = false;
   }
   cloud.saving = false;
+  if (cloud.savePending) {
+    cloud.savePending = false;
+    saveToCloud();
+  }
 }
 
 async function restoreCloudVersion() {
@@ -707,14 +743,25 @@ async function submitAuth() {
 
 async function writeUserProfile(user, displayName, isNew) {
   try {
-    const { doc, setDoc, serverTimestamp } = cloud.fns;
+    const { doc, setDoc, getDoc, serverTimestamp } = cloud.fns;
+    const ref = doc(cloud.db, "users", user.uid);
     const payload = {
       displayName: displayName || user.displayName || "",
       email: user.email,
       lastLoginAt: serverTimestamp()
     };
-    if (isNew) payload.createdAt = serverTimestamp();
-    await setDoc(doc(cloud.db, "users", user.uid), payload, { merge: true });
+    if (isNew) {
+      payload.createdAt = serverTimestamp();
+    } else {
+      // Accounts created before profile documents existed (for
+      // example the original admin accounts) get a complete profile
+      // on their next sign-in.
+      const existing = await getDoc(ref);
+      if (!existing.exists() || !existing.data()?.createdAt) {
+        payload.createdAt = serverTimestamp();
+      }
+    }
+    await setDoc(ref, payload, { merge: true });
   } catch (err) {
     console.warn("Could not update user profile document:", err);
   }
