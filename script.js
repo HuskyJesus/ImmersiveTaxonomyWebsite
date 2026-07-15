@@ -83,6 +83,14 @@ function isAdminUid(uid) {
   return ADMIN_UIDS.includes(uid);
 }
 
+/* Marks a column or element as customized so loading never
+   refreshes it back to the shipped defaults. */
+function markRecordEdited(rec) {
+  rec.hasCustomEdits = true;
+  rec.lastEditedAt = new Date().toISOString();
+  rec.lastEditedBy = cloud.user?.uid || "local";
+}
+
 const $ = (id) => document.getElementById(id);
 
 /* Small inline SVG icons (no emojis anywhere) */
@@ -307,7 +315,12 @@ function tidyV3(data) {
   data.columns.forEach((c) => {
     c.name = LEGACY_COLUMN_NAMES[c.name] || c.name;
     const def = defaultsByColumnId[c.id]?.col;
-    if (def && (!c.hasCustomEdits || c.sourceType === "manuscript-derived")) {
+    // Refresh from the shipped defaults ONLY when the record has
+    // never been customized — hasCustomEdits is the sole authority.
+    // (Checking sourceType here used to wipe saved admin edits on
+    // every load, because edited default records keep the
+    // "manuscript-derived" sourceType.)
+    if (def && !c.hasCustomEdits) {
       Object.assign(c, structuredClone(def), { id: c.id });
     }
     c.shortDescription = c.shortDescription || "";
@@ -325,7 +338,8 @@ function tidyV3(data) {
       cell.text = LEGACY_VALUE_NAMES_BY_COLUMN[colId]?.[cell.text] || LEGACY_VALUE_NAMES[cell.text] || cell.text;
       const defMeta = defaultsByColumnId[data.columns[cIndex]?.id];
       const defCell = defMeta && rowIndex < defaults.rows.length ? defaults.rows[rowIndex][defMeta.index] : null;
-      if (defCell && (!cell.hasCustomEdits || cell.sourceType === "manuscript-derived")) {
+      // Same rule as columns: never overwrite a customized element.
+      if (defCell && !cell.hasCustomEdits) {
         Object.assign(cell, structuredClone(defCell), { id: cell.id });
       }
       cell.shortDescription = cell.shortDescription || "";
@@ -532,6 +546,9 @@ async function saveToCloud() {
     cloud.savePending = true;
     return;
   }
+  // Save Now (or any direct save) supersedes a pending autosave —
+  // the debounce timer must not fire a second save afterwards.
+  clearTimeout(cloud.saveTimer);
   cloud.saving = true;
   setSyncStatus("info", "Saving…");
   try {
@@ -1077,8 +1094,11 @@ function renderTable() {
       name.spellcheck = false;
       name.textContent = col.name;
       name.addEventListener("blur", () => {
-        col.name = name.textContent.trim() || "Untitled";
-        name.textContent = col.name;
+        const newName = name.textContent.trim() || "Untitled";
+        name.textContent = newName;
+        if (newName === col.name) return;
+        col.name = newName;
+        markRecordEdited(col);
         markChanged();
       });
 
@@ -1147,7 +1167,10 @@ function renderTable() {
         text.spellcheck = false;
         text.textContent = cell.text;
         text.addEventListener("blur", () => {
-          cell.text = text.textContent.trim();
+          const newText = text.textContent.trim();
+          if (newText === cell.text) return;
+          cell.text = newText;
+          markRecordEdited(cell);
           markChanged();
         });
 
