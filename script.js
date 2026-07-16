@@ -53,7 +53,7 @@
    Form — A Handbook for the Immersive Experience Designer."
    ============================================================ */
 
-import { account, accountsReady, onAuthState, onBeforeSignOut, registerLibraryOpener, openAuthModal } from "./account.js?v=20260719";
+import { account, accountsReady, onAuthState, onBeforeSignOut, registerLibraryOpener, openAuthModal } from "./account.js?v=20260720";
 import { DEFAULT_COLUMNS, VALUE_STARTERS, buildDefaultTaxonomy } from "./starter-content.js";
 import { aiAvailable, generateWithAI } from "./ai-provider.js";
 
@@ -2001,7 +2001,7 @@ function isUsableIdea(idea) {
 async function generateIdea({ regenerate = false } = {}) {
   const topic = $("topic-input").value.trim();
   if (!topic) {
-    showTopicHint("Enter a topic first — the subject, lesson, story, or problem you want to turn into an experience.");
+    showTopicHint("Enter a topic first — the idea, subject, lesson, story, or problem you want to turn into an experience.");
     return;
   }
   hideTopicHint();
