@@ -39,6 +39,18 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
+    // A profile write may only contain these display/metadata fields.
+    // Any other key — isAdmin, admin, role, permissions, claims, or
+    // anything else — makes the write fail, so a user can never grant
+    // themselves privileges through their profile document. Admin
+    // access is decided solely by the isAdmin() UID allowlist above,
+    // never by anything stored here. Passwords are never written.
+    function isValidProfile() {
+      return request.resource.data.keys().hasOnly([
+        "displayName", "email", "createdAt", "lastLoginAt", "updatedAt"
+      ]);
+    }
+
     // The published taxonomy (one document: taxonomy/current)
     match /taxonomy/{docId} {
       allow read: if true;              // public website
@@ -48,7 +60,8 @@ service cloud.firestore {
     // User profiles: each user manages only their own document.
     // Profiles hold display metadata only — no roles, no passwords.
     match /users/{uid} {
-      allow read, create, update, delete: if isOwner(uid);
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidProfile();
 
       // Saved experiences: private to their owner
       match /savedExperiences/{experienceId} {

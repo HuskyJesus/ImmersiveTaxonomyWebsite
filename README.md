@@ -58,6 +58,10 @@ Every dimension and element has a stable internal ID plus editable descriptions:
 
 Administrators are exactly the two UIDs allowlisted in [`firestore.rules`](firestore.rules) — creating an account never grants edit access, and the rules are the authority. An unsaved generated result survives signing in.
 
+### Account settings
+
+The account menu (top right) opens **Account Settings**, available to any signed-in user. It has a Profile section (read-only email, editable display name) and a Security section (change password with current-password re-authentication, and send-yourself-a-password-reset-email). It exposes no administrator controls, and changing a display name or password never affects admin access, which stays governed only by the UID allowlist. Password values are used solely for Firebase Authentication and are never written to Firestore, local storage, or logs.
+
 ### Saved experiences
 
 Signed-in users save generated briefs to their private library: search, sort, favorite, rename, edit notes, duplicate, delete, **Load Into Workspace** (selections map back by stable ID), and **Regenerate Variation**. Experiences saved by earlier versions of the site still render.

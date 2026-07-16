@@ -687,6 +687,23 @@ function authErrorMessage(err) {
   return messages[code] || `Something went wrong (${code || "unknown error"}). Please try again.`;
 }
 
+/* Friendly messages for the signed-in security flow (re-authenticate,
+   change password, reset). Never surfaces a raw Firebase error. */
+function securityErrorMessage(err) {
+  const code = err?.code || "";
+  const messages = {
+    "auth/invalid-credential": "The current password is incorrect.",
+    "auth/wrong-password": "The current password is incorrect.",
+    "auth/user-mismatch": "Those credentials are for a different account.",
+    "auth/weak-password": "Please choose a longer new password (at least 6 characters).",
+    "auth/requires-recent-login": "For your security, please sign out and sign back in, then change your password.",
+    "auth/user-token-expired": "Your session has expired — please sign out and sign back in, then try again.",
+    "auth/too-many-requests": "Too many attempts — please wait a minute and try again.",
+    "auth/network-request-failed": "Network problem — check your connection and try again."
+  };
+  return messages[code] || `Could not complete that (${code || "unknown error"}). Please try again.`;
+}
+
 function openAuthModal(startMode) {
   setAuthMode(startMode);
   $("auth-error").hidden = true;
@@ -785,6 +802,39 @@ async function writeUserProfile(user, displayName, isNew) {
   }
 }
 
+/* On auth-state load, repair the Firestore profile from Firebase
+   Authentication (the primary source for name + email). Only writes
+   when something is missing or out of sync — never overwrites a valid
+   stored name with a blank Auth name, and never loops, because it
+   writes nothing when the two already agree. */
+async function reconcileUserProfile(user) {
+  if (!cloud.configured || !user) return;
+  try {
+    const { doc, getDoc, setDoc, serverTimestamp } = cloud.fns;
+    const ref = doc(cloud.db, "users", user.uid);
+    const snap = await getDoc(ref);
+    const data = snap.exists() ? snap.data() : null;
+    const payload = {};
+    if (!data) {
+      payload.displayName = user.displayName || "";
+      payload.email = user.email || "";
+      payload.createdAt = serverTimestamp();
+      payload.lastLoginAt = serverTimestamp();
+    } else {
+      // Prefer the Auth profile, but keep a valid stored name if Auth
+      // has none (do not replace good data with a blank).
+      if (user.displayName && data.displayName !== user.displayName) payload.displayName = user.displayName;
+      if (user.email && data.email !== user.email) payload.email = user.email;
+      if (!data.createdAt) payload.createdAt = serverTimestamp();
+    }
+    if (Object.keys(payload).length > 0) {
+      await setDoc(ref, payload, { merge: true });
+    }
+  } catch (err) {
+    console.warn("Could not reconcile user profile:", err);
+  }
+}
+
 async function signOutUser() {
   if (cloud.dirty && isAdminUid(cloud.user?.uid)) await saveToCloud();
   await cloud.fns.signOut(cloud.auth);
@@ -822,7 +872,10 @@ function applyAccessControl() {
 
 function onAuthChanged(user) {
   cloud.user = user;
-  applyAccessControl();
+  applyAccessControl();   // header/menu refresh immediately from Auth
+  if (user) {
+    reconcileUserProfile(user);   // repair Firestore profile if needed (no await — non-blocking)
+  }
   if (user && isAdminUid(user.uid)) {
     setSyncStatus(cloud.dirty ? "pending" : "ok",
       cloud.dirty ? "Unsaved changes — they save automatically as you edit, or press Save Now." : "All changes saved");
@@ -838,6 +891,162 @@ function toggleAccountDropdown() {
 function closeAccountDropdown() {
   $("account-dropdown").hidden = true;
   $("account-btn").setAttribute("aria-expanded", "false");
+}
+
+/* ------------------------------------------------------------
+   7b. ACCOUNT SETTINGS (signed-in users — no admin controls here)
+   Profile (display name, read-only email) + Security (change
+   password, password reset). UID and admin status are never
+   editable here; admin access stays governed by the UID allowlist.
+   ------------------------------------------------------------ */
+let settingsNameBaseline = "";     // display name shown when the modal opened
+let resetEmailCooldown = false;    // blocks rapid repeat reset-email sends
+
+function setSettingsStatus(el, kind, message) {
+  el.textContent = message;
+  el.className = `sync-status settings-status is-${kind}`;
+  el.hidden = false;
+}
+
+function openAccountSettings() {
+  closeAccountDropdown();
+  if (!cloud.user) { openAuthModal("signin"); return; }
+  const name = cloud.user.displayName || "";
+  $("settings-email").value = cloud.user.email || "";
+  $("settings-name").value = name;
+  settingsNameBaseline = name;
+  $("settings-current-pw").value = "";
+  $("settings-new-pw").value = "";
+  $("settings-confirm-pw").value = "";
+  $("settings-name-status").hidden = true;
+  $("settings-pw-status").hidden = true;
+  $("account-settings-modal").showModal();
+  $("settings-name").focus();
+}
+
+function settingsHasUnsavedName() {
+  const current = $("settings-name").value.trim();
+  return current !== "" && current !== settingsNameBaseline;
+}
+
+function closeAccountSettings() {
+  if (settingsHasUnsavedName() &&
+      !confirm("You have an unsaved display name change. Close without saving?")) {
+    return;
+  }
+  $("account-settings-modal").close();
+}
+
+/* Syncs users/{uid}.displayName to Firestore. Returns true on
+   success. Never writes any password field. */
+async function writeProfileDisplayName(name) {
+  try {
+    const { doc, setDoc, serverTimestamp } = cloud.fns;
+    await setDoc(doc(cloud.db, "users", cloud.user.uid), {
+      displayName: name,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.warn("Could not sync display name to the profile record:", err);
+    return false;
+  }
+}
+
+async function saveDisplayName() {
+  if (!cloud.user) return;
+  const status = $("settings-name-status");
+  const btn = $("settings-name-save");
+  const name = $("settings-name").value.trim();
+  if (!name) { setSettingsStatus(status, "error", "Please enter a display name (it cannot be blank)."); return; }
+
+  btn.disabled = true;
+  setSettingsStatus(status, "info", "Saving…");
+
+  // Firebase Authentication is the primary source for the name.
+  try {
+    await cloud.fns.updateProfile(cloud.user, { displayName: name });
+  } catch (err) {
+    btn.disabled = false;
+    setSettingsStatus(status, "error", "Update failed — " + securityErrorMessage(err));
+    return;
+  }
+
+  // Auth succeeded: reflect it in the header/menu right away.
+  applyAccessControl();
+
+  // Sync Firestore; retry once before reporting a partial failure so
+  // the UI never claims full success while the record is stale.
+  let profileOk = await writeProfileDisplayName(name);
+  if (!profileOk) profileOk = await writeProfileDisplayName(name);
+
+  btn.disabled = false;
+  settingsNameBaseline = name;
+  if (profileOk) {
+    setSettingsStatus(status, "ok", "Display name updated.");
+  } else {
+    setSettingsStatus(status, "pending",
+      "Your name was updated on your account, but saving it to your profile record failed. It will re-sync the next time you sign in.");
+  }
+}
+
+async function changePassword() {
+  if (!cloud.user) return;
+  const status = $("settings-pw-status");
+  const btn = $("settings-pw-change");
+  const currentPassword = $("settings-current-pw").value;
+  const newPassword = $("settings-new-pw").value;
+  const confirmPassword = $("settings-confirm-pw").value;
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    setSettingsStatus(status, "error", "Please fill in all three password fields."); return;
+  }
+  if (newPassword !== confirmPassword) {
+    setSettingsStatus(status, "error", "The new passwords don't match."); return;
+  }
+  if (newPassword.length < 6) {
+    setSettingsStatus(status, "error", "Please choose a new password of at least 6 characters."); return;
+  }
+  if (newPassword === currentPassword) {
+    setSettingsStatus(status, "error", "The new password must be different from your current password."); return;
+  }
+
+  btn.disabled = true;
+  setSettingsStatus(status, "info", "Updating password…");
+  try {
+    const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = cloud.fns;
+    // Re-authenticate first (this is a security-sensitive action and
+    // may require recent login) — then change the password.
+    const credential = EmailAuthProvider.credential(cloud.user.email, currentPassword);
+    await reauthenticateWithCredential(cloud.user, credential);
+    await updatePassword(cloud.user, newPassword);
+    // Passwords are never persisted anywhere — clear the fields.
+    $("settings-current-pw").value = "";
+    $("settings-new-pw").value = "";
+    $("settings-confirm-pw").value = "";
+    setSettingsStatus(status, "ok", "Password changed. You're still signed in.");
+  } catch (err) {
+    setSettingsStatus(status, "error", securityErrorMessage(err));
+  }
+  btn.disabled = false;
+}
+
+async function sendResetFromSettings() {
+  if (!cloud.user || resetEmailCooldown) return;
+  const status = $("settings-pw-status");
+  const btn = $("settings-pw-reset");
+  btn.disabled = true;
+  resetEmailCooldown = true;
+  try {
+    await cloud.fns.sendPasswordResetEmail(cloud.auth, cloud.user.email);
+    setSettingsStatus(status, "ok", "Password reset email sent — check your inbox and spam folder.");
+    // Brief cooldown to prevent rapid repeat submissions.
+    setTimeout(() => { btn.disabled = false; resetEmailCooldown = false; }, 30000);
+  } catch (err) {
+    setSettingsStatus(status, "error", securityErrorMessage(err));
+    btn.disabled = false;
+    resetEmailCooldown = false;
+  }
 }
 
 /* ------------------------------------------------------------
@@ -2339,8 +2548,23 @@ function init() {
 
   // Account dropdown
   $("account-btn").addEventListener("click", toggleAccountDropdown);
+  $("menu-settings-btn").addEventListener("click", openAccountSettings);
   $("menu-signout-btn").addEventListener("click", signOutUser);
   $("menu-library-btn").addEventListener("click", openLibrary);
+
+  // Account settings
+  $("settings-close").addEventListener("click", closeAccountSettings);
+  $("settings-name-save").addEventListener("click", saveDisplayName);
+  $("settings-pw-change").addEventListener("click", changePassword);
+  $("settings-pw-reset").addEventListener("click", sendResetFromSettings);
+  // Escape triggers the dialog "cancel" event — warn only when a
+  // display-name edit is unsaved; otherwise let it close.
+  $("account-settings-modal").addEventListener("cancel", (e) => {
+    if (settingsHasUnsavedName() &&
+        !confirm("You have an unsaved display name change. Close without saving?")) {
+      e.preventDefault();
+    }
+  });
 
   // Experience library
   $("library-close").addEventListener("click", () => $("library-modal").close());

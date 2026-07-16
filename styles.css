@@ -1141,6 +1141,27 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 
 .editor-extras summary:hover { color: var(--ink); }
 
+/* Account settings: section dividers, read-only email, status line */
+.modal h3.settings-section-title {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.modal h3.settings-section-title:first-of-type {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.field input[readonly] {
+  color: var(--ink-soft);
+  background: var(--cell);
+  cursor: default;
+}
+
+.settings-status { margin: 12px 0 0; }
+
 .login-error {
   margin: 12px 0 0;
   color: var(--danger);
