@@ -18,10 +18,10 @@ Visitors arrive on a brief introduction: what the taxonomy is (a **map of design
 One flexible workspace — not a wizard. Nothing is gated; everything is reachable in any order:
 
 - **Experience Focus** — a compact topic input with a helper sentence and concrete examples (cooking, the history of the Civil War, onboarding new nurses, …).
-- **Generation controls** — primary: **Generate Experience**; secondary: **Generate From Random Path**, **Regenerate**; supporting: **Randomize Unlocked Elements**, **Clear Selections**, **Clear Locks**.
 - **Search** — matches dimension names, element names, all descriptions, manuscript fields, and examples. Opening a result shows its description; a **Select This Element** button inside the dialog applies it — search alone never changes your profile.
-- **The taxonomy table** — the centerpiece. Ten dimensions as columns, Elements 0–4 as rows. Headers show the dimension name and a one-line subtitle; every element shows its number, name, a short meaning, an information control, and (when selected) a lock control.
-- **The generated result** — appears beneath the table as a design brief.
+- **The taxonomy table** — the centerpiece. Ten dimensions as columns, Elements 0–4 as rows. Headers show the dimension name and a one-line subtitle; every element shows its number, name, a short meaning, an information control, and (when selected) a lock control. Table-specific controls sit above the table: **Randomize Unlocked Elements**, **Clear Selections**, **Clear Locks**.
+- **Generation** — a single primary button sits directly below the table. It reads **Generate Experience** until the current inputs (topic plus selected elements) have been generated, then reads **Regenerate Experience**; pressing it again produces a fresh variation of the same topic, selections, and locks. Changing the topic or a selection returns the label to **Generate Experience**. Toggling a lock without changing the selected element does not reset it.
+- **The generated result** — appears beneath the generation button as a design brief.
 
 ### Selecting and locking
 
@@ -32,8 +32,7 @@ One flexible workspace — not a wizard. Nothing is gated; everything is reachab
 ### Randomization
 
 - **Randomize Unlocked Elements** — keeps the topic and every locked element, selects one random element in each unlocked dimension, and does *not* generate.
-- **Generate From Random Path** — same, then generates immediately. With no topic entered, the randomized selections are kept and the workspace asks for a topic instead of inventing vague copy. Random profiles are framed as starting points to revise, never as finished designs.
-- **Generate Experience** with unselected dimensions offers a choice: randomize the missing ones, or generate from only your selected dimensions. There is no completion gate.
+- **Generate Experience** with unselected dimensions offers a choice: randomize the missing ones, or generate from only your selected dimensions. There is no completion gate. With no topic entered, generation is declined and the topic field is highlighted instead of inventing vague copy.
 
 ### The generated design brief
 
@@ -76,7 +75,8 @@ The header's **Edit Taxonomy** button switches the table into editing: inline na
 
 | File | Purpose |
 |---|---|
-| `index.html` | Landing, about, workspace, book section, dialogs |
+| `index.html` | Landing and about page |
+| `design.html` | The design workspace, generation, and dialogs |
 | `styles.css` | All styling — theme variables at the top |
 | `script.js` | All logic — workspace, locks, generator, cloud sync, auth, library |
 | `starter-content.js` | Default taxonomy + editable starter descriptions |

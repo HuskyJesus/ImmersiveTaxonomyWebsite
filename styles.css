@@ -16,13 +16,15 @@
   --green-700: #1b5741;
   --green-100: #ddefe6;
 
-  /* Content surfaces */
-  --bg: #f6f5f1;
-  --surface: #ffffff;
-  --cell: #f4f5f1;
-  --ink: #17241f;
-  --ink-soft: #5c6b64;
-  --line: #e6e8e2;
+  /* Content surfaces — a slightly darker, more grounded neutral
+     palette. The green and purple brand colors above are unchanged
+     and remain the most recognizable colors on the page. */
+  --bg: #e4e6de;        /* page background — grounded warm neutral */
+  --surface: #f2f3ed;   /* cards, modals, dropdowns — soft off-white */
+  --cell: #e7e9e0;      /* unselected taxonomy cells, inset fields */
+  --ink: #17241f;       /* primary text */
+  --ink-soft: #4e5a53;  /* muted text — darker for contrast on the deeper bg */
+  --line: #ccd1c6;      /* borders and dividers — stronger */
 
   /* Purple accent — actions, selection, focus */
   --grad-a: #4f46e5;
@@ -183,7 +185,7 @@ main {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -406,13 +408,26 @@ main {
   font-weight: 600;
 }
 
-.gen-controls {
+/* Standalone generation action — visually separate from the topic
+   card above and the table controls, directly below the table. */
+.generate-bar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 6px;
+  justify-content: center;
+  margin: 6px 0 30px;
+}
+
+.generate-bar .btn { min-width: 260px; }
+
+/* Note shown on a generated result when the inputs have changed
+   since it was produced. */
+.result-note {
+  margin: 0 0 14px;
+  padding: 9px 14px;
+  border-left: 3px solid var(--grad-a);
+  background: var(--grad-soft);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
 }
 
 .scroll-cue {
@@ -462,7 +477,7 @@ main {
    ------------------------------------------------------------ */
 .btn {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   padding: 11px 18px;
   border-radius: 12px;
@@ -481,6 +496,8 @@ main {
 }
 
 .btn:active { transform: translateY(0) scale(0.97); }
+
+.btn:focus-visible { outline: 2px solid var(--grad-a); outline-offset: 2px; }
 
 .btn-primary {
   background: var(--gradient);
@@ -555,11 +572,13 @@ main {
   border-radius: 12px;
   font-size: 1rem;
   font-family: inherit;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--cell);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 #topic-input:focus {
   outline: none;
+  background: var(--surface);
   border-color: var(--grad-a);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
 }
@@ -582,7 +601,7 @@ main {
 
 #search-input:focus {
   outline: none;
-  background: #fff;
+  background: var(--surface);
   border-color: var(--grad-a);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
 }
@@ -592,7 +611,7 @@ main {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lift);
@@ -737,7 +756,7 @@ tbody td {
 .selectable { cursor: pointer; user-select: none; }
 
 .selectable:hover {
-  background: #fff;
+  background: var(--surface);
   border-color: var(--line);
   transform: translateY(-1px);
   box-shadow: var(--shadow);
@@ -810,7 +829,7 @@ td .cell-text {
   display: inline-grid;
   place-items: center;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-soft);
   cursor: pointer;
   width: 20px;
@@ -833,7 +852,7 @@ td .cell-text {
 .cell-info-btn {
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink-soft);
   cursor: pointer;
   width: 20px;
@@ -871,7 +890,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 }
 
 .edit-cell .cell-text:focus {
-  background: #fff;
+  background: var(--surface);
   box-shadow: inset 0 0 0 2px var(--grad-a);
   border-radius: 4px;
 }
@@ -984,15 +1003,8 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 }
 
 /* ------------------------------------------------------------
-   Book placeholder + footer
+   Footer
    ------------------------------------------------------------ */
-.book-section {
-  text-align: center;
-  padding: 32px 24px 8px;
-}
-
-.book-section h2 { margin: 0 0 6px; font-size: 1.4rem; letter-spacing: -0.01em; }
-
 .site-footer {
   background: var(--green-950);
   color: var(--green-100);
@@ -1016,6 +1028,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   box-shadow: var(--shadow-lift);
   padding: 26px 28px;
   width: min(560px, calc(100vw - 32px));
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -1049,7 +1062,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 
 .modal-close {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 0.95rem;
@@ -1096,12 +1109,14 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   font-size: 0.95rem;
   font-family: inherit;
   resize: vertical;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--cell);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .field input:focus,
 .field textarea:focus {
   outline: none;
+  background: var(--surface);
   border-color: var(--grad-a);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
 }
@@ -1180,6 +1195,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   border-radius: 10px;
   font: inherit;
   font-size: 0.9rem;
+  background: var(--cell);
 }
 
 .library-controls select {
@@ -1188,7 +1204,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   border-radius: 10px;
   font: inherit;
   font-size: 0.9rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .lib-filter { font-size: 0.88rem; font-weight: 600; }
@@ -1227,11 +1243,12 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
+  background: var(--cell);
 }
 
 .icon-btn {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   padding: 4px 8px;
   font-size: 0.85rem;
@@ -1264,7 +1281,5 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   .library-controls { flex-direction: column; align-items: stretch; }
   .lib-actions .btn { flex: 1; }
   .idea-actions .btn { flex: 1; }
-  .gen-controls { flex-direction: column; align-items: stretch; }
-  .gen-controls .toolbar-group { justify-content: stretch; }
-  .gen-controls .btn { flex: 1; }
+  .generate-bar .btn { width: 100%; min-width: 0; }
 }

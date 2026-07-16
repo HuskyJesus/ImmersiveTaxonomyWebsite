@@ -202,6 +202,7 @@ let mode = "design";                 // "design" | "edit"
 let selectedCells = new Set();       // one "row:col" per selected dimension
 let lockedDims = new Set();          // column indexes whose selection is locked
 let lastGeneration = null;           // { topic, idea, selections }
+let generatedFingerprint = null;     // fingerprint of the inputs behind lastGeneration
 
 const cloud = {
   configured: isFirebaseConfigured(),
@@ -1036,6 +1037,9 @@ async function deleteLibraryItem() {
 
 function loadSelectionsIntoGenerator(saved) {
   setMode("design");
+  // A loaded profile starts as "not yet generated" this session, so
+  // its result (if any) is cleared and the button reads Generate.
+  clearResultDisplay();
   selectedCells.clear();
   lockedDims.clear();
   (saved.selections || []).forEach((s) => {
@@ -1062,7 +1066,7 @@ function libraryRegenerate() {
   if (!libraryOpenItem) return;
   loadSelectionsIntoGenerator(libraryOpenItem.data);
   $("library-modal").close();
-  generateIdea();
+  generateIdea({ regenerate: true });   // use the saved selections as-is
 }
 
 /* ------------------------------------------------------------
@@ -1260,6 +1264,7 @@ function renderTable() {
   container.append(table);
 
   updateSelectionSummary();
+  updateGenerationState();   // selection/lock/topic changes may flip the label
 }
 
 function updateSelectionSummary() {
@@ -1690,20 +1695,6 @@ function randomizeUnlocked() {
   renderTable();
 }
 
-/* Generate From Random Path: randomizes every unlocked dimension
-   (exactly one element per dimension), then generates. If there is
-   no topic, the randomized selections are kept and the user is
-   asked to enter one. */
-function randomPath() {
-  randomizeUnlocked();
-  const topic = $("topic-input").value.trim();
-  if (!topic) {
-    showTopicHint("Your randomized starting point is ready — add a topic above and press Generate Experience. Remember: a random profile is a starting point to revise, not a finished design.");
-    return;
-  }
-  generateIdea({ note: "random-path" });
-}
-
 function showTopicHint(message) {
   const hint = $("topic-hint");
   hint.textContent = message;
@@ -1714,6 +1705,64 @@ function showTopicHint(message) {
 
 function hideTopicHint() {
   $("topic-hint").hidden = true;
+}
+
+/* ------------------------------------------------------------
+   GENERATION INPUT STATE
+   One primary button drives generation. It reads "Generate
+   Experience" until the current inputs (topic + selected elements)
+   have actually been generated, then reads "Regenerate Experience".
+   Locks are deliberately excluded from the fingerprint: toggling a
+   lock without changing the selected element does not change what
+   would be generated, so the label must not reset.
+   ------------------------------------------------------------ */
+function currentInputFingerprint() {
+  const topic = $("topic-input").value.trim();
+  const selections = [];
+  selectedCells.forEach((key) => {
+    const [r, c] = key.split(":").map(Number);
+    const cell = taxonomy.rows[r][c];
+    if (cell.text.trim() === "") return;
+    selections.push(`${taxonomy.columns[c].id}:${cell.id}`);
+  });
+  selections.sort();
+  return JSON.stringify({ topic, selections });
+}
+
+function hasGeneratedCurrentInputs() {
+  return lastGeneration !== null && generatedFingerprint === currentInputFingerprint();
+}
+
+/* Keeps the Generate button label and the "inputs changed" note in
+   step with the current inputs. Safe to call after any input change;
+   it never disturbs the button while a generation is in progress. */
+function updateGenerationState() {
+  const btn = $("generate-btn");
+  if (btn && !btn.disabled) {
+    btn.textContent = hasGeneratedCurrentInputs() ? "Regenerate Experience" : "Generate Experience";
+  }
+  const note = $("result-note");
+  if (note) {
+    note.hidden = !(lastGeneration !== null && !hasGeneratedCurrentInputs());
+  }
+}
+
+/* The click/Enter entry point: regenerate when the current inputs
+   are already generated, otherwise generate fresh. */
+function handleGenerate() {
+  generateIdea({ regenerate: hasGeneratedCurrentInputs() });
+}
+
+/* Clears the on-screen result and the generation state. Used when
+   starting over and when loading a saved profile, so a saved
+   experience is never confused with a freshly generated one. */
+function clearResultDisplay() {
+  lastGeneration = null;
+  generatedFingerprint = null;
+  $("idea-output").innerHTML = "";
+  $("result-section").hidden = true;
+  renderIdeaActions();
+  updateGenerationState();
 }
 
 /* ------------------------------------------------------------
@@ -2086,7 +2135,7 @@ function isUsableIdea(idea) {
     Array.isArray(idea.rationale);
 }
 
-async function generateIdea() {
+async function generateIdea({ regenerate = false } = {}) {
   const topic = $("topic-input").value.trim();
   if (!topic) {
     showTopicHint("Enter a topic first — the subject, lesson, story, or problem you want to turn into an experience.");
@@ -2094,18 +2143,22 @@ async function generateIdea() {
   }
   hideTopicHint();
 
-  // Unselected dimensions? Offer to randomize them — never a hard gate.
-  const decided = decidedColumns();
-  if (decided.size === 0) {
-    if (confirm("No elements are selected yet. Randomize one element in every dimension as a starting point?\n\n(OK = randomize and generate · Cancel = go back and choose)")) {
-      randomizeUnlocked();
-    } else {
-      return;
-    }
-  } else if (decided.size < taxonomy.columns.length) {
-    const names = taxonomy.columns.filter((_, c) => !decided.has(c)).map((c) => c.name).join(", ");
-    if (confirm(`Unselected dimensions: ${names}.\n\nOK = randomize those and generate · Cancel = generate using only your selected dimensions`)) {
-      randomizeUnlocked();
+  // Unselected dimensions? Offer to randomize them — never a hard
+  // gate. Skipped when regenerating: those inputs were already
+  // generated once and must stay exactly the same.
+  if (!regenerate) {
+    const decided = decidedColumns();
+    if (decided.size === 0) {
+      if (confirm("No elements are selected yet. Randomize one element in every dimension as a starting point?\n\n(OK = randomize and generate · Cancel = go back and choose)")) {
+        randomizeUnlocked();
+      } else {
+        return;
+      }
+    } else if (decided.size < taxonomy.columns.length) {
+      const names = taxonomy.columns.filter((_, c) => !decided.has(c)).map((c) => c.name).join(", ");
+      if (confirm(`Unselected dimensions: ${names}.\n\nOK = randomize those and generate · Cancel = generate using only your selected dimensions`)) {
+        randomizeUnlocked();
+      }
     }
   }
 
@@ -2142,7 +2195,8 @@ async function generateIdea() {
   renderIdeaActions();
 
   btn.disabled = false;
-  btn.textContent = "Generate Experience";
+  generatedFingerprint = currentInputFingerprint();
+  updateGenerationState();
   $("result-section").hidden = false;
   $("result-section").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -2163,14 +2217,6 @@ function renderIdeaActions() {
     holder.append(save);
   }
 
-  const again = document.createElement("button");
-  again.className = "btn btn-brand";
-  again.type = "button";
-  again.title = "Same topic and selections, a fresh interpretation";
-  again.textContent = "Regenerate";
-  again.addEventListener("click", generateIdea);
-  holder.append(again);
-
   const over = document.createElement("button");
   over.className = "btn btn-quiet";
   over.type = "button";
@@ -2183,11 +2229,9 @@ function renderIdeaActions() {
 function startOver() {
   selectedCells.clear();
   lockedDims.clear();
-  lastGeneration = null;
   $("topic-input").value = "";
   hideTopicHint();
-  $("result-section").hidden = true;
-  $("idea-output").innerHTML = "";
+  clearResultDisplay();
   renderTable();
   $("workspace").scrollIntoView({ behavior: "smooth" });
   $("topic-input").focus();
@@ -2242,16 +2286,14 @@ function init() {
   $("reset-btn").addEventListener("click", resetToDefault);
 
   // Workspace controls
-  $("topic-input").addEventListener("input", hideTopicHint);
+  $("topic-input").addEventListener("input", () => {
+    hideTopicHint();
+    updateGenerationState();   // editing the topic resets the button to Generate
+  });
   $("topic-input").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") generateIdea();
+    if (e.key === "Enter") handleGenerate();
   });
-  $("generate-btn").addEventListener("click", generateIdea);
-  $("random-path-btn").addEventListener("click", randomPath);
-  $("regen-btn").addEventListener("click", () => {
-    if (lastGeneration) generateIdea();
-    else showTopicHint("Generate an experience first — Regenerate then produces a fresh variation of it.");
-  });
+  $("generate-btn").addEventListener("click", handleGenerate);
   $("randomize-btn").addEventListener("click", randomizeUnlocked);
   $("clear-btn").addEventListener("click", clearSelection);
   $("clear-locks-btn").addEventListener("click", clearLocks);
