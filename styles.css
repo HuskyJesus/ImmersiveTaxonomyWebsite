@@ -44,7 +44,10 @@
 
 [hidden] { display: none !important; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
 
 body {
   margin: 0;
@@ -53,9 +56,11 @@ body {
   background: var(--bg);
   color: var(--ink);
   line-height: 1.6;
+  overflow-x: hidden;
 }
 
 main {
+  width: 100%;
   max-width: 1240px;
   margin: 0 auto;
   padding: 0 24px 40px;
@@ -85,11 +90,11 @@ main {
    independently of the left/right widths, so a long display name or
    the Sign In / Sign Up pair never pushes the tabs off-center. */
 .header-inner {
-  max-width: 1240px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   padding: 14px 24px;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   grid-template-areas: "brand nav actions";
   align-items: center;
   gap: 12px;
@@ -102,10 +107,13 @@ main {
   align-items: center;
   gap: 10px;
   font-weight: 700;
+  min-width: 0;
 }
 
-.site-nav { grid-area: nav; justify-self: center; }
-.header-actions { grid-area: actions; justify-self: end; }
+.brand-link { color: inherit; text-decoration: none; }
+
+.site-nav { grid-area: nav; justify-self: center; min-width: 0; }
+.header-actions { grid-area: actions; justify-self: end; min-width: 0; }
 
 .brand-mark {
   display: inline-grid;
@@ -118,8 +126,6 @@ main {
   font-weight: 800;
   letter-spacing: 0.06em;
 }
-
-.brand-name { font-size: 1rem; }
 
 /* Simple site navigation */
 .site-nav {
@@ -151,12 +157,13 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
 }
 
 /* Account controls (upper right) */
-.account-area { display: flex; align-items: center; gap: 8px; }
+.account-area { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
-#auth-buttons { display: flex; gap: 8px; }
+#auth-buttons { display: flex; gap: 8px; min-width: 0; }
 
 .account-btn {
   display: inline-flex;
@@ -254,9 +261,9 @@ main {
 
 .landing-question {
   margin: 6px 0 10px;
-  font-size: clamp(1.6rem, 4vw, 2.5rem);
+  font-size: 2.35rem;
   line-height: 1.18;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .landing-sub {
@@ -283,9 +290,9 @@ main {
 
 .about-hero h1 {
   margin: 0 0 14px;
-  font-size: clamp(2rem, 5vw, 3rem);
+  font-size: 2.85rem;
   line-height: 1.12;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .about-cta { display: flex; justify-content: center; margin: 26px 0 12px; }
@@ -372,7 +379,7 @@ main {
   text-align: center;
 }
 
-.video-section h2 { margin: 0 0 6px; font-size: 1.5rem; letter-spacing: -0.01em; }
+.video-section h2 { margin: 0 0 6px; font-size: 1.5rem; letter-spacing: 0; }
 
 .section-sub { margin: 0 0 18px; color: var(--ink-soft); font-size: 0.95rem; }
 
@@ -629,9 +636,16 @@ a.btn {
 /* ------------------------------------------------------------
    Taxonomy search
    ------------------------------------------------------------ */
-.search-bar { position: relative; margin-bottom: 0; min-width: min(420px, 100%); flex: 1 1 340px; }
+.search-bar {
+  position: relative;
+  margin-bottom: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 420px;
+  flex: 1 1 340px;
+}
 
-#search-input {
+#taxonomy-filter {
   width: 100%;
   padding: 12px 16px;
   border: 1px solid var(--line);
@@ -642,7 +656,7 @@ a.btn {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
-#search-input:focus {
+#taxonomy-filter:focus {
   outline: none;
   background: var(--surface);
   border-color: var(--grad-a);
@@ -720,6 +734,7 @@ a.btn {
 .table-actions { justify-content: flex-end; }
 
 .table-wrap {
+  max-width: 100%;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   padding-bottom: 4px;
@@ -983,7 +998,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 .report-title {
   margin: 4px 0 10px;
   font-size: 1.6rem;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 
 .report-pitch {
@@ -1070,7 +1085,11 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   border-radius: var(--radius);
   box-shadow: var(--shadow-lift);
   padding: 26px 28px;
-  width: min(560px, calc(100vw - 32px));
+  width: calc(100vw - 32px);
+  max-width: 560px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--surface);
   color: var(--ink);
 }
@@ -1082,7 +1101,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 
 .modal[open] { animation: rise 0.22s ease both; }
 
-.modal-wide { width: min(760px, calc(100vw - 32px)); }
+.modal-wide { max-width: 760px; }
 
 .modal-head {
   display: flex;
@@ -1092,7 +1111,7 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   margin-bottom: 6px;
 }
 
-.modal-head h2 { margin: 0; font-size: 1.3rem; letter-spacing: -0.01em; }
+.modal-head h2 { margin: 0; font-size: 1.3rem; letter-spacing: 0; }
 
 .modal-context {
   margin: 0;
@@ -1166,23 +1185,10 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 
 .modal-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 
-.modal-actions:has(> [hidden]:only-child) { margin-top: 0; }
-
-/* Manuscript-field group in the editor */
-.editor-extras {
-  margin-top: 16px;
-  border-top: 1px solid var(--line);
-  padding-top: 10px;
+.editor-form {
+  display: block;
+  margin-top: 6px;
 }
-
-.editor-extras summary {
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 0.88rem;
-  color: var(--ink-soft);
-}
-
-.editor-extras summary:hover { color: var(--ink); }
 
 /* Account settings: section dividers, read-only email, status line */
 .modal h3.settings-section-title {
@@ -1349,6 +1355,8 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   .lib-actions .btn { flex: 1; }
   .idea-actions .btn { flex: 1; }
   .generate-bar .btn { width: 100%; min-width: 0; }
+  .landing-question { font-size: 2rem; }
+  .about-hero h1 { font-size: 2.35rem; }
 }
 
 /* Narrow screens: brand + account on the top row, centered nav on
@@ -1369,4 +1377,9 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
   .landing-choices { flex-direction: column; align-items: stretch; }
   .landing-choices .btn { width: 100%; }
   .landing-hero { padding: 40px 22px; }
+  .landing-question { font-size: 1.72rem; }
+  .about-hero { padding: 38px 12px 8px; }
+  .about-hero h1 { font-size: 2rem; }
+  .site-nav { width: 100%; justify-content: center; }
+  .site-nav a { padding: 7px 10px; }
 }

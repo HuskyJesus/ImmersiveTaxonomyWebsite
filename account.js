@@ -13,7 +13,7 @@
    saved-experience storage — there is only one login system.
    ============================================================ */
 
-import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js?v=20260716-ixd2";
 
 const FIREBASE_VERSION = "10.12.2";
 

@@ -37,7 +37,7 @@
    add its settings to ai-config.js. Nothing else changes.
    ============================================================ */
 
-import { aiConfig } from "./ai-config.js";
+import { aiConfig } from "./ai-config.js?v=20260716-ixd2";
 
 /* ------------------------------------------------------------
    Shared prompt builder — providers may reuse this.

@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IXD — Immersive Experience Design Taxonomy</title>
   <meta name="description" content="A map of immersive design possibilities. Explore ten design dimensions, make intentional choices, and generate complete immersive experience concepts. Based on the taxonomy developed by JJ Ruscella." />
-  <link rel="stylesheet" href="styles.css?v=20260720" />
+  <link rel="stylesheet" href="styles.css?v=20260716-ixd2" />
 </head>
 <body>
 
@@ -16,13 +16,12 @@
     <div class="header-inner">
       <a class="brand brand-link" href="index.html">
         <span class="brand-mark" aria-hidden="true">IXD</span>
-        <span class="brand-name">Immersive Taxonomy</span>
       </a>
 
       <nav class="site-nav" aria-label="Primary">
         <a href="index.html">Home</a>
         <a href="design.html" class="is-active" aria-current="page">Design</a>
-        <a href="about.html">About</a>
+        <a href="about.html">Learn</a>
       </nav>
 
       <div class="header-actions">
@@ -107,16 +106,21 @@
     <!-- The taxonomy table — the centerpiece -->
     <section class="workspace taxonomy-panel" aria-label="Taxonomy table">
       <div class="table-tools">
-        <div class="search-bar">
+        <form id="taxonomy-search-form" class="search-bar" role="search" aria-label="Filter the taxonomy" autocomplete="off">
           <input
-            id="search-input"
+            id="taxonomy-filter"
+            name="taxonomy-filter-query"
             type="search"
             placeholder="Search taxonomy"
             autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            inputmode="search"
             aria-label="Search the taxonomy"
+            aria-controls="search-results"
           />
           <div id="search-results" class="search-results" hidden role="listbox"></div>
-        </div>
+        </form>
         <div class="toolbar-group table-actions">
           <button id="randomize-btn" class="btn btn-quiet" type="button"
             title="Keeps your locked elements and picks one random element in every unlocked dimension. Does not generate.">
@@ -181,33 +185,52 @@
       <h2 id="desc-editor-title">Edit</h2>
       <button id="desc-editor-close" class="modal-close" type="button" aria-label="Close">✕</button>
     </div>
-    <label class="field">
-      <span id="edit-cat-name-label">Name</span>
-      <input id="edit-cat-name" type="text" />
-    </label>
-    <label class="field">
-      <span>Short description <small>(one sentence — shown as the tooltip)</small></span>
-      <textarea id="edit-cat-short" rows="2"></textarea>
-    </label>
-    <label class="field">
-      <span>Detailed description</span>
-      <textarea id="edit-cat-detail" rows="4"></textarea>
-    </label>
-    <label class="field">
-      <span>Example</span>
-      <textarea id="edit-cat-example" rows="3"></textarea>
-    </label>
-
-    <!-- Manuscript-derived fields (labels swap for dimension/element) -->
-    <details class="editor-extras" id="editor-extras">
-      <summary>Manuscript fields</summary>
-      <label class="field"><span id="edit-extra-label-1"></span><textarea id="edit-extra-1" rows="2"></textarea></label>
-      <label class="field"><span id="edit-extra-label-2"></span><textarea id="edit-extra-2" rows="2"></textarea></label>
-      <label class="field"><span id="edit-extra-label-3"></span><textarea id="edit-extra-3" rows="2"></textarea></label>
-      <label class="field"><span id="edit-extra-label-4"></span><textarea id="edit-extra-4" rows="2"></textarea></label>
-      <label class="field"><span id="edit-extra-label-5"></span><input id="edit-extra-5" type="text" /></label>
-      <label class="field"><span id="edit-extra-label-6"></span><input id="edit-extra-6" type="text" /></label>
-    </details>
+    <form id="desc-editor-form" class="editor-form" autocomplete="off">
+      <label class="field">
+        <span id="edit-cat-name-label">Name</span>
+        <input id="edit-cat-name" type="text" autocomplete="off" />
+      </label>
+      <label id="edit-subtitle-field" class="field">
+        <span>Framing or Subtitle</span>
+        <textarea id="edit-cat-subtitle" rows="2"></textarea>
+      </label>
+      <label class="field">
+        <span>Quick Definition</span>
+        <textarea id="edit-cat-short" rows="2"></textarea>
+      </label>
+      <label class="field">
+        <span>Full Explanation</span>
+        <textarea id="edit-cat-detail" rows="4"></textarea>
+      </label>
+      <label id="edit-design-question-field" class="field">
+        <span>Design Question</span>
+        <textarea id="edit-design-question" rows="2"></textarea>
+      </label>
+      <label id="edit-why-it-matters-field" class="field">
+        <span>Why It Matters</span>
+        <textarea id="edit-why-it-matters" rows="3"></textarea>
+      </label>
+      <label id="edit-participant-role-field" class="field">
+        <span>Participant Role</span>
+        <textarea id="edit-participant-role" rows="2"></textarea>
+      </label>
+      <label id="edit-designer-responsibility-field" class="field">
+        <span>Designer Responsibility</span>
+        <textarea id="edit-designer-responsibility" rows="2"></textarea>
+      </label>
+      <label id="edit-use-cases-field" class="field">
+        <span>Use Cases</span>
+        <textarea id="edit-use-cases" rows="3"></textarea>
+      </label>
+      <label id="edit-cautions-field" class="field">
+        <span>Cautions</span>
+        <textarea id="edit-cautions" rows="3"></textarea>
+      </label>
+      <label id="edit-example-field" class="field">
+        <span>Example in Practice</span>
+        <textarea id="edit-cat-example" rows="3"></textarea>
+      </label>
+    </form>
 
     <p class="panel-note" id="editor-default-hint"></p>
     <div class="modal-actions">
@@ -339,6 +362,6 @@
   </dialog>
 
   <!-- The ?v= query busts cached browser copies after a deploy — bump it when script.js changes -->
-  <script type="module" src="script.js?v=20260720"></script>
+  <script type="module" src="script.js?v=20260716-ixd2"></script>
 </body>
 </html>

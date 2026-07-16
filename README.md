@@ -9,11 +9,11 @@ A landing page and flexible design workspace for the immersive experience design
 
 ## How the site works
 
-The site is three separate pages that share one header (branding left, centered navigation, account controls right) and one authentication system:
+The site is three separate pages that share one header (IXD mark left, centered Home / Design / Learn navigation, account controls right) and one authentication system:
 
-- **`index.html` — landing.** A simple welcome ("Hi! Would you like to start designing or learn about the site?") with two choices: **Start Designing** (to the design workspace) and **Learn More** (to the About page). Account controls are always in the header.
+- **`index.html` — landing.** A simple welcome ("Hi! Would you like to start designing or learn more about IXD?") with two choices: **Start Designing** (to the design workspace) and **Learn More** (to the Learn/About page). Account controls are always in the header.
 - **`design.html` — the design workspace.** The taxonomy table, generation, saved experiences, and admin editing.
-- **`about.html` — about.** What the taxonomy is, who it is for, how it is used, and that it is a map of possibilities rather than a score (a higher element is not automatically better; the right choice depends on the experience's purpose). Includes its own **Start Designing** action.
+- **`about.html` — Learn.** What the taxonomy is, who it is for, how it is used, and that it is a map of possibilities rather than a score (a higher element is not automatically better; the right choice depends on the experience's purpose). Includes its own **Start Designing** action.
 
 The landing and About pages load only the shared account module (`account.js`), never the taxonomy editor or generator.
 
@@ -22,7 +22,7 @@ The landing and About pages load only the shared account module (`account.js`), 
 One flexible workspace — not a wizard. Nothing is gated; everything is reachable in any order:
 
 - **Experience Focus** — a compact topic input with a helper sentence and concrete examples (cooking, the history of the Civil War, onboarding new nurses, …).
-- **Search** — matches dimension names, element names, all descriptions, manuscript fields, and examples. Opening a result shows its description; a **Select This Element** button inside the dialog applies it — search alone never changes your profile.
+- **Search** — a dedicated taxonomy search/filter field that does not participate in browser account autofill. It matches dimension names, element names, descriptions, useful manuscript-derived fields, and examples. Opening a result shows its description; a **Select This Element** button inside the dialog applies it — search alone never changes your profile.
 - **The taxonomy table** — the centerpiece. Ten dimensions as columns, Elements 0–4 as rows. Headers show the dimension name and a one-line subtitle; every element shows its number, name, a short meaning, an information control, and (when selected) a lock control. Table-specific controls sit above the table: **Randomize Unlocked Elements**, **Clear Selections**, **Clear Locks**.
 - **Generation** — a single primary button sits directly below the table. It reads **Generate Experience** until the current inputs (topic plus selected elements) have been generated, then reads **Regenerate Experience**; pressing it again produces a fresh variation of the same topic, selections, and locks. Changing the topic or a selection returns the label to **Generate Experience**. Toggling a lock without changing the selected element does not reset it.
 - **The generated result** — appears beneath the generation button as a design brief.
@@ -50,7 +50,7 @@ Ten dimensions, each with Elements 0–4 (row position = element number):
 
 Interactivity · Embodiment · Co-Participation · Story · Dynamics · Gamification · Immersive Technology · Meta-Control · Didactic Capacity · Data
 
-Every dimension and element has a stable internal ID plus editable descriptions: short, detailed, and example, plus manuscript fields (dimensions: chapter subtitle, central design question, why it matters, Element 0→4 progression, source chapter; elements: participant role, designer responsibility, use cases, cautions, source chapter and section). Manuscript fields render in the info dialogs only when filled. **The description text currently in [`starter-content.js`](starter-content.js) is editable placeholder wording written for this site; the manuscript fields ship empty and should be filled from the manuscript** — via Edit Taxonomy on the site or in that file.
+Every dimension and element has a stable internal ID plus editable descriptions and manuscript-derived metadata. Administrators edit the useful public-facing fields in one vertical dialog: categories show name, framing/subtitle, definitions, design question, why it matters, use cases, and cautions; elements show name, definitions, participant role, designer responsibility, use cases, cautions, and example in practice. Source/progression/keyword metadata stays in the data model without being shown prominently.
 
 ## Authentication roles
 
@@ -72,7 +72,7 @@ Signed-in users save generated briefs to their private library: search, sort, fa
 
 ### Edit Taxonomy (administrators)
 
-The header's **Edit Taxonomy** button switches the table into editing: inline name edits, per-element and per-dimension description editors (including all manuscript fields) with Save/Cancel, a **Compare / Restore Default** button inside the editor, add/delete dimensions and element rows (with confirmation), **Restore Manuscript Defaults**, cloud autosave with visible status, **Save Now**, and JSON backup tools. Edit controls never appear in the normal workspace.
+The header's **Edit Taxonomy** button switches the table into editing: inline name edits, per-element and per-category description editors with Save/Cancel, a **Compare / Restore Default** button inside the editor, add/delete dimensions and element rows (with confirmation), **Restore Manuscript Defaults**, cloud autosave with visible status, **Save Now**, and JSON backup tools. Edit controls never appear in the normal workspace.
 
 ## Testing locally and in the cloud
 
@@ -84,7 +84,7 @@ The header's **Edit Taxonomy** button switches the table into editing: inline na
 | File | Purpose |
 |---|---|
 | `index.html` | Landing page (welcome + two choices) |
-| `about.html` | About the taxonomy |
+| `about.html` | Learn/About page for the taxonomy |
 | `design.html` | The design workspace, generation, and dialogs |
 | `styles.css` | All styling — theme variables at the top |
 | `account.js` | Shared authentication + account menu + Account Settings (loaded by every page) |

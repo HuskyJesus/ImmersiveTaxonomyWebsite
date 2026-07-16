@@ -53,9 +53,9 @@
    Form — A Handbook for the Immersive Experience Designer."
    ============================================================ */
 
-import { account, accountsReady, onAuthState, onBeforeSignOut, registerLibraryOpener, openAuthModal } from "./account.js?v=20260720";
-import { DEFAULT_COLUMNS, VALUE_STARTERS, buildDefaultTaxonomy } from "./starter-content.js";
-import { aiAvailable, generateWithAI } from "./ai-provider.js";
+import { account, accountsReady, onAuthState, onBeforeSignOut, registerLibraryOpener, openAuthModal } from "./account.js?v=20260716-ixd2";
+import { DEFAULT_COLUMNS, VALUE_STARTERS, buildDefaultTaxonomy } from "./starter-content.js?v=20260716-ixd2";
+import { aiAvailable, generateWithAI } from "./ai-provider.js?v=20260716-ixd2";
 
 /* ------------------------------------------------------------
    1. CONSTANTS + ADMIN ALLOWLIST
@@ -105,6 +105,8 @@ const COLUMN_EXTRA_FIELDS = [
   ["subtitle", "Chapter framing subtitle"],
   ["designQuestion", "Central design question"],
   ["whyItMatters", "Why it matters"],
+  ["useCases", "Use cases"],
+  ["cautions", "Cautions"],
   ["progression", "Five-element progression"],
   ["source", "Source chapter"]
 ];
@@ -115,6 +117,37 @@ const VALUE_EXTRA_FIELDS = [
   ["cautions", "Cautions"],
   ["source", "Source chapter and section"],
   ["keywords", "Search keywords"]
+];
+
+const COLUMN_EDITOR_FIELDS = [
+  { key: "subtitle", id: "edit-cat-subtitle", fieldId: "edit-subtitle-field" },
+  { key: "shortDescription", id: "edit-cat-short" },
+  { key: "detailedDescription", id: "edit-cat-detail" },
+  { key: "designQuestion", id: "edit-design-question", fieldId: "edit-design-question-field" },
+  { key: "whyItMatters", id: "edit-why-it-matters", fieldId: "edit-why-it-matters-field" },
+  { key: "useCases", id: "edit-use-cases", fieldId: "edit-use-cases-field" },
+  { key: "cautions", id: "edit-cautions", fieldId: "edit-cautions-field" }
+];
+
+const VALUE_EDITOR_FIELDS = [
+  { key: "shortDescription", id: "edit-cat-short" },
+  { key: "detailedDescription", id: "edit-cat-detail" },
+  { key: "participantRole", id: "edit-participant-role", fieldId: "edit-participant-role-field" },
+  { key: "designerResponsibility", id: "edit-designer-responsibility", fieldId: "edit-designer-responsibility-field" },
+  { key: "useCases", id: "edit-use-cases", fieldId: "edit-use-cases-field" },
+  { key: "cautions", id: "edit-cautions", fieldId: "edit-cautions-field" },
+  { key: "example", id: "edit-cat-example", fieldId: "edit-example-field" }
+];
+
+const ALL_EDITOR_FIELD_IDS = [
+  "edit-subtitle-field",
+  "edit-design-question-field",
+  "edit-why-it-matters-field",
+  "edit-participant-role-field",
+  "edit-designer-responsibility-field",
+  "edit-use-cases-field",
+  "edit-cautions-field",
+  "edit-example-field"
 ];
 
 const LEGACY_COLUMN_NAMES = {
@@ -1180,6 +1213,8 @@ function openInfoModal(target) {
   } else {
     add("Central design question", rec.designQuestion);
     add("Why it matters", rec.whyItMatters);
+    add("Use cases", rec.useCases);
+    add("Cautions", rec.cautions);
     add("Five-element progression", rec.progression);
     add("Example", rec.example);
     add("Source", rec.source);
@@ -1203,8 +1238,16 @@ function selectFromInfoModal() {
 
 let editingTarget = null;
 
-function extrasFor(type) {
-  return type === "column" ? COLUMN_EXTRA_FIELDS : VALUE_EXTRA_FIELDS;
+function editorFieldsFor(type) {
+  return type === "column" ? COLUMN_EDITOR_FIELDS : VALUE_EDITOR_FIELDS;
+}
+
+function resetEditorFields() {
+  ALL_EDITOR_FIELD_IDS.forEach((id) => { $(id).hidden = true; });
+  [...COLUMN_EDITOR_FIELDS, ...VALUE_EDITOR_FIELDS].forEach(({ id }) => {
+    const el = $(id);
+    if (el) el.value = "";
+  });
 }
 
 function openEditor(target) {
@@ -1212,23 +1255,21 @@ function openEditor(target) {
   const rec = targetRecord(target);
   const isValue = target.type === "value";
   $("desc-editor-title").textContent = isValue
-    ? `Edit “${rec.text}” in “${taxonomy.columns[target.c].name}”`
-    : `Edit “${rec.name}”`;
-  $("edit-cat-name-label").textContent = isValue ? "Element name" : "Dimension name";
+    ? `Edit Element: ${rec.text}`
+    : `Edit Category: ${rec.name}`;
+  $("edit-cat-name-label").textContent = isValue ? "Element Name" : "Category Name";
   $("edit-cat-name").value = isValue ? rec.text : rec.name;
-  $("edit-cat-short").value = rec.shortDescription;
-  $("edit-cat-detail").value = rec.detailedDescription;
-  $("edit-cat-example").value = rec.example;
-
-  extrasFor(target.type).forEach(([key, label], i) => {
-    $(`edit-extra-label-${i + 1}`).textContent = label;
-    $(`edit-extra-${i + 1}`).value = rec[key] || "";
+  resetEditorFields();
+  editorFieldsFor(target.type).forEach(({ key, id, fieldId }) => {
+    if (fieldId) $(fieldId).hidden = false;
+    $(id).value = rec[key] || "";
   });
 
   // Compare/restore only exists for items that have a manuscript default
   const def = defaultRecordFor(target);
   $("desc-editor-default").hidden = !def;
   $("editor-default-hint").textContent = "";
+  defaultShown = false;
   $("desc-editor").showModal();
 }
 
@@ -1261,11 +1302,8 @@ function compareOrRestoreDefault() {
     return;
   }
   $("edit-cat-name").value = isValue ? def.text : def.name;
-  $("edit-cat-short").value = def.shortDescription || "";
-  $("edit-cat-detail").value = def.detailedDescription || "";
-  $("edit-cat-example").value = def.example || "";
-  extrasFor(editingTarget.type).forEach(([key], i) => {
-    $(`edit-extra-${i + 1}`).value = def[key] || "";
+  editorFieldsFor(editingTarget.type).forEach(({ key, id }) => {
+    $(id).value = def[key] || "";
   });
   $("editor-default-hint").textContent = "Defaults loaded into the editor — press Save to apply, Cancel to discard.";
   defaultShown = false;
@@ -1276,11 +1314,8 @@ function editorIsDirty() {
   const rec = targetRecord(editingTarget);
   const currentName = editingTarget.type === "value" ? rec.text : rec.name;
   if ($("edit-cat-name").value.trim() !== currentName) return true;
-  if ($("edit-cat-short").value.trim() !== rec.shortDescription) return true;
-  if ($("edit-cat-detail").value.trim() !== rec.detailedDescription) return true;
-  if ($("edit-cat-example").value.trim() !== rec.example) return true;
-  return extrasFor(editingTarget.type).some(
-    ([key], i) => $(`edit-extra-${i + 1}`).value.trim() !== (rec[key] || "")
+  return editorFieldsFor(editingTarget.type).some(
+    ({ key, id }) => $(id).value.trim() !== (rec[key] || "")
   );
 }
 
@@ -1292,11 +1327,8 @@ function saveEditor() {
   } else {
     rec.name = name || "Untitled";
   }
-  rec.shortDescription = $("edit-cat-short").value.trim();
-  rec.detailedDescription = $("edit-cat-detail").value.trim();
-  rec.example = $("edit-cat-example").value.trim();
-  extrasFor(editingTarget.type).forEach(([key], i) => {
-    rec[key] = $(`edit-extra-${i + 1}`).value.trim();
+  editorFieldsFor(editingTarget.type).forEach(({ key, id }) => {
+    rec[key] = $(id).value.trim();
   });
   rec.sourceType = rec.sourceType || "manuscript-derived";
   rec.hasCustomEdits = true;
@@ -1325,7 +1357,7 @@ function cancelEditor() {
    ------------------------------------------------------------ */
 function columnHaystack(col) {
   return [col.name, col.subtitle, col.shortDescription, col.detailedDescription, col.example,
-    col.designQuestion, col.whyItMatters, col.progression].join(" ").toLowerCase();
+    col.designQuestion, col.whyItMatters, col.useCases, col.cautions, col.progression].join(" ").toLowerCase();
 }
 
 function cellHaystack(cell) {
@@ -1353,7 +1385,7 @@ function searchTaxonomy(term) {
 }
 
 function renderSearchResults() {
-  const term = $("search-input").value.trim();
+  const term = $("taxonomy-filter").value.trim();
   const box = $("search-results");
   if (term.length < 2) { box.hidden = true; box.innerHTML = ""; return; }
 
@@ -2001,7 +2033,7 @@ function isUsableIdea(idea) {
 async function generateIdea({ regenerate = false } = {}) {
   const topic = $("topic-input").value.trim();
   if (!topic) {
-    showTopicHint("Enter a topic first — the idea, subject, lesson, story, or problem you want to turn into an experience.");
+    showTopicHint("Enter the idea, subject, lesson, story, or problem you want to turn into an immersive experience.");
     return;
   }
   hideTopicHint();
@@ -2168,14 +2200,16 @@ function init() {
   $("desc-editor-cancel").addEventListener("click", cancelEditor);
   $("desc-editor-close").addEventListener("click", cancelEditor);
   $("desc-editor-default").addEventListener("click", compareOrRestoreDefault);
+  $("desc-editor-form").addEventListener("submit", (e) => e.preventDefault());
   $("desc-editor").addEventListener("cancel", (e) => {
     if (editorIsDirty() && !confirm("Discard your changes?")) e.preventDefault();
     else { editingTarget = null; defaultShown = false; }
   });
 
   // Search
-  $("search-input").addEventListener("input", renderSearchResults);
-  $("search-input").addEventListener("keydown", (e) => {
+  $("taxonomy-search-form").addEventListener("submit", (e) => e.preventDefault());
+  $("taxonomy-filter").addEventListener("input", renderSearchResults);
+  $("taxonomy-filter").addEventListener("keydown", (e) => {
     if (e.key === "Escape") { $("search-results").hidden = true; }
     if (e.key === "Enter") {
       const first = $("search-results").querySelector(".search-result");
