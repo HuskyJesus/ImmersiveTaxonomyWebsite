@@ -53,7 +53,7 @@
    Form — A Handbook for the Immersive Experience Designer."
    ============================================================ */
 
-import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+import { account, accountsReady, onAuthState, onBeforeSignOut, registerLibraryOpener, openAuthModal } from "./account.js?v=20260719";
 import { DEFAULT_COLUMNS, VALUE_STARTERS, buildDefaultTaxonomy } from "./starter-content.js";
 import { aiAvailable, generateWithAI } from "./ai-provider.js";
 
@@ -62,7 +62,6 @@ import { aiAvailable, generateWithAI } from "./ai-provider.js";
    ------------------------------------------------------------ */
 const STORAGE_KEY = "immersive-taxonomy-v3";
 const LEGACY_KEYS = ["immersive-taxonomy-v2", "immersive-taxonomy-v1"];
-const FIREBASE_VERSION = "10.12.2";
 const CLOUD_DOC_PATH = ["taxonomy", "current"];
 const SCHEMA_VERSION = 3;
 const EXPERIENCE_SCHEMA_VERSION = 2;   // v2 = the design-brief report shape
@@ -203,9 +202,13 @@ let selectedCells = new Set();       // one "row:col" per selected dimension
 let lockedDims = new Set();          // column indexes whose selection is locked
 let lastGeneration = null;           // { topic, idea, selections }
 let generatedFingerprint = null;     // fingerprint of the inputs behind lastGeneration
+let pendingOpenSavedLibrary =        // "design.html?panel=saved" from the account menu
+  new URLSearchParams(location.search).get("panel") === "saved";
 
+/* Taxonomy cloud-sync state. Firebase handles (db, fns, user) are
+   owned by account.js and mirrored here once ready. */
 const cloud = {
-  configured: isFirebaseConfigured(),
+  configured: account.configured,
   ready: false,
   db: null,
   auth: null,
@@ -465,27 +468,26 @@ function deserializeFromCloud(data) {
 }
 
 async function initCloud() {
-  if (!cloud.configured) {
+  cloud.configured = account.configured;
+  if (!account.configured) {
     setSyncStatus("local", "Local mode — edits save in this browser only.");
     return;
   }
   setSyncStatus("info", "Connecting…");
+  // account.js sets up the Firebase app, auth observer, and Firestore.
+  await accountsReady;
+  cloud.db = account.db;
+  cloud.fns = account.fns;
+  cloud.auth = account.auth;
+  if (!cloud.db) {
+    setSyncStatus("error", "Cloud unavailable — showing the last locally cached version.");
+    cloud.ready = true;
+    return;
+  }
   try {
-    const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
-    const [appMod, fsMod, authMod] = await Promise.all([
-      import(`${base}/firebase-app.js`),
-      import(`${base}/firebase-firestore.js`),
-      import(`${base}/firebase-auth.js`)
-    ]);
-    const app = appMod.initializeApp(firebaseConfig);
-    cloud.db = fsMod.getFirestore(app);
-    cloud.auth = authMod.getAuth(app);
-    cloud.fns = { ...fsMod, ...authMod };
-
-    authMod.onAuthStateChanged(cloud.auth, onAuthChanged);
     await loadFromCloud();
   } catch (err) {
-    console.warn("Cloud unavailable, using local cache.", err);
+    console.warn("Cloud taxonomy load failed, using local cache.", err);
     setSyncStatus("error", "Cloud unavailable — showing the last locally cached version.");
   }
   cloud.ready = true;
@@ -668,384 +670,37 @@ window.addEventListener("beforeunload", (e) => {
 });
 
 /* ------------------------------------------------------------
-   6. AUTHENTICATION + USER ACCOUNTS
-   ------------------------------------------------------------ */
-let authMode = "signin";
-
-function authErrorMessage(err) {
-  const code = err?.code || "";
-  const messages = {
-    "auth/invalid-email": "That doesn't look like a valid email address.",
-    "auth/email-already-in-use": "An account with that email already exists — try signing in instead.",
-    "auth/weak-password": "Please choose a longer password (at least 6 characters).",
-    "auth/invalid-credential": "Email or password is incorrect.",
-    "auth/wrong-password": "Email or password is incorrect.",
-    "auth/user-not-found": "No account found with that email.",
-    "auth/too-many-requests": "Too many attempts — please wait a minute and try again.",
-    "auth/network-request-failed": "Network problem — check your connection and try again."
-  };
-  return messages[code] || `Something went wrong (${code || "unknown error"}). Please try again.`;
-}
-
-/* Friendly messages for the signed-in security flow (re-authenticate,
-   change password, reset). Never surfaces a raw Firebase error. */
-function securityErrorMessage(err) {
-  const code = err?.code || "";
-  const messages = {
-    "auth/invalid-credential": "The current password is incorrect.",
-    "auth/wrong-password": "The current password is incorrect.",
-    "auth/user-mismatch": "Those credentials are for a different account.",
-    "auth/weak-password": "Please choose a longer new password (at least 6 characters).",
-    "auth/requires-recent-login": "For your security, please sign out and sign back in, then change your password.",
-    "auth/user-token-expired": "Your session has expired — please sign out and sign back in, then try again.",
-    "auth/too-many-requests": "Too many attempts — please wait a minute and try again.",
-    "auth/network-request-failed": "Network problem — check your connection and try again."
-  };
-  return messages[code] || `Could not complete that (${code || "unknown error"}). Please try again.`;
-}
-
-function openAuthModal(startMode) {
-  setAuthMode(startMode);
-  $("auth-error").hidden = true;
-  $("auth-info").hidden = true;
-  $("auth-email").value = "";
-  $("auth-password").value = "";
-  $("auth-confirm").value = "";
-  $("auth-name").value = "";
-  $("auth-modal").showModal();
-  ($(authMode === "signup" ? "auth-name" : "auth-email")).focus();
-}
-
-function setAuthMode(next) {
-  authMode = next;
-  const titles = { signin: "Sign In", signup: "Create Account", reset: "Reset Password" };
-  const submits = { signin: "Sign In", signup: "Sign Up", reset: "Send Reset Email" };
-  $("auth-title").textContent = titles[next];
-  $("auth-submit").textContent = submits[next];
-  $("auth-name-field").hidden = next !== "signup";
-  $("auth-confirm-field").hidden = next !== "signup";
-  $("auth-password-field").hidden = next === "reset";
-  $("auth-to-signup").hidden = next !== "signin";
-  $("auth-to-signin").hidden = next === "signin";
-  $("auth-to-reset").hidden = next !== "signin";
-  $("auth-error").hidden = true;
-  $("auth-info").hidden = true;
-}
-
-function showAuthError(message) {
-  $("auth-error").textContent = message;
-  $("auth-error").hidden = false;
-  $("auth-info").hidden = true;
-}
-
-async function submitAuth() {
-  const email = $("auth-email").value.trim();
-  const password = $("auth-password").value;
-  const submitBtn = $("auth-submit");
-
-  if (!email) { showAuthError("Please enter your email address."); return; }
-
-  submitBtn.disabled = true;
-  try {
-    if (authMode === "reset") {
-      await cloud.fns.sendPasswordResetEmail(cloud.auth, email);
-      $("auth-info").textContent = "Reset email sent — check your inbox (and spam folder), then sign in with your new password.";
-      $("auth-info").hidden = false;
-      $("auth-error").hidden = true;
-
-    } else if (authMode === "signup") {
-      const name = $("auth-name").value.trim();
-      const confirm = $("auth-confirm").value;
-      if (!name) { showAuthError("Please choose a display name."); submitBtn.disabled = false; return; }
-      if (password.length < 6) { showAuthError("Please choose a password of at least 6 characters."); submitBtn.disabled = false; return; }
-      if (password !== confirm) { showAuthError("The two passwords don't match."); submitBtn.disabled = false; return; }
-
-      const cred = await cloud.fns.createUserWithEmailAndPassword(cloud.auth, email, password);
-      await cloud.fns.updateProfile(cred.user, { displayName: name });
-      await writeUserProfile(cred.user, name, true);
-      $("auth-modal").close();
-
-    } else {
-      const cred = await cloud.fns.signInWithEmailAndPassword(cloud.auth, email, password);
-      await writeUserProfile(cred.user, cred.user.displayName || "", false);
-      $("auth-modal").close();
-    }
-  } catch (err) {
-    showAuthError(authErrorMessage(err));
-  }
-  submitBtn.disabled = false;
-}
-
-async function writeUserProfile(user, displayName, isNew) {
-  try {
-    const { doc, setDoc, getDoc, serverTimestamp } = cloud.fns;
-    const ref = doc(cloud.db, "users", user.uid);
-    const payload = {
-      displayName: displayName || user.displayName || "",
-      email: user.email,
-      lastLoginAt: serverTimestamp()
-    };
-    if (isNew) {
-      payload.createdAt = serverTimestamp();
-    } else {
-      // Accounts created before profile documents existed (for
-      // example the original admin accounts) get a complete profile
-      // on their next sign-in.
-      const existing = await getDoc(ref);
-      if (!existing.exists() || !existing.data()?.createdAt) {
-        payload.createdAt = serverTimestamp();
-      }
-    }
-    await setDoc(ref, payload, { merge: true });
-  } catch (err) {
-    console.warn("Could not update user profile document:", err);
-  }
-}
-
-/* On auth-state load, repair the Firestore profile from Firebase
-   Authentication (the primary source for name + email). Only writes
-   when something is missing or out of sync — never overwrites a valid
-   stored name with a blank Auth name, and never loops, because it
-   writes nothing when the two already agree. */
-async function reconcileUserProfile(user) {
-  if (!cloud.configured || !user) return;
-  try {
-    const { doc, getDoc, setDoc, serverTimestamp } = cloud.fns;
-    const ref = doc(cloud.db, "users", user.uid);
-    const snap = await getDoc(ref);
-    const data = snap.exists() ? snap.data() : null;
-    const payload = {};
-    if (!data) {
-      payload.displayName = user.displayName || "";
-      payload.email = user.email || "";
-      payload.createdAt = serverTimestamp();
-      payload.lastLoginAt = serverTimestamp();
-    } else {
-      // Prefer the Auth profile, but keep a valid stored name if Auth
-      // has none (do not replace good data with a blank).
-      if (user.displayName && data.displayName !== user.displayName) payload.displayName = user.displayName;
-      if (user.email && data.email !== user.email) payload.email = user.email;
-      if (!data.createdAt) payload.createdAt = serverTimestamp();
-    }
-    if (Object.keys(payload).length > 0) {
-      await setDoc(ref, payload, { merge: true });
-    }
-  } catch (err) {
-    console.warn("Could not reconcile user profile:", err);
-  }
-}
-
-async function signOutUser() {
-  if (cloud.dirty && isAdminUid(cloud.user?.uid)) await saveToCloud();
-  await cloud.fns.signOut(cloud.auth);
-  closeAccountDropdown();
-}
-
-/* ------------------------------------------------------------
-   7. ACCESS CONTROL
+   6. ACCESS CONTROL (design workspace)
+   Shared authentication, the account menu, and Account Settings
+   live in account.js. Here we only react to sign-in/out to toggle
+   the admin-only edit affordances and keep the sync status right.
    ------------------------------------------------------------ */
 function canEdit() {
   return !cloud.configured || (!!cloud.user && isAdminUid(cloud.user.uid));
 }
 
-function applyAccessControl() {
+function applyDesignAccessControl() {
   $("edit-mode-btn").hidden = !canEdit();
   $("restore-cloud-btn").hidden = !(cloud.configured && cloud.user && isAdminUid(cloud.user.uid));
-
-  $("account-area").hidden = !cloud.configured;
-  if (cloud.configured) {
-    const signedIn = !!cloud.user;
-    $("auth-buttons").hidden = signedIn;
-    $("account-menu-wrap").hidden = !signedIn;
-    if (signedIn) {
-      const name = cloud.user.displayName || cloud.user.email;
-      $("account-name").textContent = name;
-      $("account-initial").textContent = name.charAt(0).toUpperCase();
-    }
-  }
-
   if (mode === "edit" && !canEdit()) setMode("design");
   // Re-render only the actions row — an unsaved generated result
   // must survive signing in or out.
   renderIdeaActions();
 }
 
-function onAuthChanged(user) {
+/* Registered with account.js and run on every auth-state change
+   (and after a display-name save). */
+function onDesignAuth(user) {
   cloud.user = user;
-  applyAccessControl();   // header/menu refresh immediately from Auth
-  if (user) {
-    reconcileUserProfile(user);   // repair Firestore profile if needed (no await — non-blocking)
-  }
+  applyDesignAccessControl();
   if (user && isAdminUid(user.uid)) {
     setSyncStatus(cloud.dirty ? "pending" : "ok",
       cloud.dirty ? "Unsaved changes — they save automatically as you edit, or press Save Now." : "All changes saved");
   }
-}
-
-function toggleAccountDropdown() {
-  const dd = $("account-dropdown");
-  dd.hidden = !dd.hidden;
-  $("account-btn").setAttribute("aria-expanded", String(!dd.hidden));
-}
-
-function closeAccountDropdown() {
-  $("account-dropdown").hidden = true;
-  $("account-btn").setAttribute("aria-expanded", "false");
-}
-
-/* ------------------------------------------------------------
-   7b. ACCOUNT SETTINGS (signed-in users — no admin controls here)
-   Profile (display name, read-only email) + Security (change
-   password, password reset). UID and admin status are never
-   editable here; admin access stays governed by the UID allowlist.
-   ------------------------------------------------------------ */
-let settingsNameBaseline = "";     // display name shown when the modal opened
-let resetEmailCooldown = false;    // blocks rapid repeat reset-email sends
-
-function setSettingsStatus(el, kind, message) {
-  el.textContent = message;
-  el.className = `sync-status settings-status is-${kind}`;
-  el.hidden = false;
-}
-
-function openAccountSettings() {
-  closeAccountDropdown();
-  if (!cloud.user) { openAuthModal("signin"); return; }
-  const name = cloud.user.displayName || "";
-  $("settings-email").value = cloud.user.email || "";
-  $("settings-name").value = name;
-  settingsNameBaseline = name;
-  $("settings-current-pw").value = "";
-  $("settings-new-pw").value = "";
-  $("settings-confirm-pw").value = "";
-  $("settings-name-status").hidden = true;
-  $("settings-pw-status").hidden = true;
-  $("account-settings-modal").showModal();
-  $("settings-name").focus();
-}
-
-function settingsHasUnsavedName() {
-  const current = $("settings-name").value.trim();
-  return current !== "" && current !== settingsNameBaseline;
-}
-
-function closeAccountSettings() {
-  if (settingsHasUnsavedName() &&
-      !confirm("You have an unsaved display name change. Close without saving?")) {
-    return;
-  }
-  $("account-settings-modal").close();
-}
-
-/* Syncs users/{uid}.displayName to Firestore. Returns true on
-   success. Never writes any password field. */
-async function writeProfileDisplayName(name) {
-  try {
-    const { doc, setDoc, serverTimestamp } = cloud.fns;
-    await setDoc(doc(cloud.db, "users", cloud.user.uid), {
-      displayName: name,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-    return true;
-  } catch (err) {
-    console.warn("Could not sync display name to the profile record:", err);
-    return false;
-  }
-}
-
-async function saveDisplayName() {
-  if (!cloud.user) return;
-  const status = $("settings-name-status");
-  const btn = $("settings-name-save");
-  const name = $("settings-name").value.trim();
-  if (!name) { setSettingsStatus(status, "error", "Please enter a display name (it cannot be blank)."); return; }
-
-  btn.disabled = true;
-  setSettingsStatus(status, "info", "Saving…");
-
-  // Firebase Authentication is the primary source for the name.
-  try {
-    await cloud.fns.updateProfile(cloud.user, { displayName: name });
-  } catch (err) {
-    btn.disabled = false;
-    setSettingsStatus(status, "error", "Update failed — " + securityErrorMessage(err));
-    return;
-  }
-
-  // Auth succeeded: reflect it in the header/menu right away.
-  applyAccessControl();
-
-  // Sync Firestore; retry once before reporting a partial failure so
-  // the UI never claims full success while the record is stale.
-  let profileOk = await writeProfileDisplayName(name);
-  if (!profileOk) profileOk = await writeProfileDisplayName(name);
-
-  btn.disabled = false;
-  settingsNameBaseline = name;
-  if (profileOk) {
-    setSettingsStatus(status, "ok", "Display name updated.");
-  } else {
-    setSettingsStatus(status, "pending",
-      "Your name was updated on your account, but saving it to your profile record failed. It will re-sync the next time you sign in.");
-  }
-}
-
-async function changePassword() {
-  if (!cloud.user) return;
-  const status = $("settings-pw-status");
-  const btn = $("settings-pw-change");
-  const currentPassword = $("settings-current-pw").value;
-  const newPassword = $("settings-new-pw").value;
-  const confirmPassword = $("settings-confirm-pw").value;
-
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    setSettingsStatus(status, "error", "Please fill in all three password fields."); return;
-  }
-  if (newPassword !== confirmPassword) {
-    setSettingsStatus(status, "error", "The new passwords don't match."); return;
-  }
-  if (newPassword.length < 6) {
-    setSettingsStatus(status, "error", "Please choose a new password of at least 6 characters."); return;
-  }
-  if (newPassword === currentPassword) {
-    setSettingsStatus(status, "error", "The new password must be different from your current password."); return;
-  }
-
-  btn.disabled = true;
-  setSettingsStatus(status, "info", "Updating password…");
-  try {
-    const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = cloud.fns;
-    // Re-authenticate first (this is a security-sensitive action and
-    // may require recent login) — then change the password.
-    const credential = EmailAuthProvider.credential(cloud.user.email, currentPassword);
-    await reauthenticateWithCredential(cloud.user, credential);
-    await updatePassword(cloud.user, newPassword);
-    // Passwords are never persisted anywhere — clear the fields.
-    $("settings-current-pw").value = "";
-    $("settings-new-pw").value = "";
-    $("settings-confirm-pw").value = "";
-    setSettingsStatus(status, "ok", "Password changed. You're still signed in.");
-  } catch (err) {
-    setSettingsStatus(status, "error", securityErrorMessage(err));
-  }
-  btn.disabled = false;
-}
-
-async function sendResetFromSettings() {
-  if (!cloud.user || resetEmailCooldown) return;
-  const status = $("settings-pw-status");
-  const btn = $("settings-pw-reset");
-  btn.disabled = true;
-  resetEmailCooldown = true;
-  try {
-    await cloud.fns.sendPasswordResetEmail(cloud.auth, cloud.user.email);
-    setSettingsStatus(status, "ok", "Password reset email sent — check your inbox and spam folder.");
-    // Brief cooldown to prevent rapid repeat submissions.
-    setTimeout(() => { btn.disabled = false; resetEmailCooldown = false; }, 30000);
-  } catch (err) {
-    setSettingsStatus(status, "error", securityErrorMessage(err));
-    btn.disabled = false;
-    resetEmailCooldown = false;
+  // Honor a "?panel=saved" request once the user is known.
+  if (user && pendingOpenSavedLibrary) {
+    pendingOpenSavedLibrary = false;
+    openLibrary();
   }
 }
 
@@ -1101,7 +756,6 @@ let libraryItems = [];
 let libraryOpenItem = null;
 
 async function openLibrary() {
-  closeAccountDropdown();
   if (!cloud.user) { openAuthModal("signin"); return; }
   $("library-list-view").hidden = false;
   $("library-detail-view").hidden = true;
@@ -2530,41 +2184,16 @@ function init() {
   });
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".search-bar")) $("search-results").hidden = true;
-    if (!e.target.closest(".account-menu-wrap")) closeAccountDropdown();
   });
 
-  // Authentication
-  $("signin-btn").addEventListener("click", () => openAuthModal("signin"));
-  $("signup-btn").addEventListener("click", () => openAuthModal("signup"));
-  $("auth-submit").addEventListener("click", submitAuth);
-  $("auth-cancel").addEventListener("click", () => $("auth-modal").close());
-  $("auth-close").addEventListener("click", () => $("auth-modal").close());
-  $("auth-to-signup").addEventListener("click", () => setAuthMode("signup"));
-  $("auth-to-signin").addEventListener("click", () => setAuthMode("signin"));
-  $("auth-to-reset").addEventListener("click", () => setAuthMode("reset"));
-  ["auth-password", "auth-confirm"].forEach((id) =>
-    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") submitAuth(); })
-  );
-
-  // Account dropdown
-  $("account-btn").addEventListener("click", toggleAccountDropdown);
-  $("menu-settings-btn").addEventListener("click", openAccountSettings);
-  $("menu-signout-btn").addEventListener("click", signOutUser);
-  $("menu-library-btn").addEventListener("click", openLibrary);
-
-  // Account settings
-  $("settings-close").addEventListener("click", closeAccountSettings);
-  $("settings-name-save").addEventListener("click", saveDisplayName);
-  $("settings-pw-change").addEventListener("click", changePassword);
-  $("settings-pw-reset").addEventListener("click", sendResetFromSettings);
-  // Escape triggers the dialog "cancel" event — warn only when a
-  // display-name edit is unsaved; otherwise let it close.
-  $("account-settings-modal").addEventListener("cancel", (e) => {
-    if (settingsHasUnsavedName() &&
-        !confirm("You have an unsaved display name change. Close without saving?")) {
-      e.preventDefault();
-    }
+  // Shared auth + account menu are wired by account.js. The design
+  // page only registers how it reacts to sign-in/out and where the
+  // Saved Experiences library lives.
+  onAuthState(onDesignAuth);
+  onBeforeSignOut(async () => {
+    if (cloud.dirty && isAdminUid(cloud.user?.uid)) await saveToCloud();
   });
+  registerLibraryOpener(openLibrary);
 
   // Experience library
   $("library-close").addEventListener("click", () => $("library-modal").close());
@@ -2583,11 +2212,10 @@ function init() {
   $("lib-load").addEventListener("click", libraryLoad);
   $("lib-regen").addEventListener("click", libraryRegenerate);
 
-  // Footer + video
-  $("footer-copyright").textContent = `© ${new Date().getFullYear()} Ruscella Immersive. All rights reserved.`;
+  // Video (footer copyright is set by account.js on every page)
   setupVideo();
 
-  applyAccessControl();
+  applyDesignAccessControl();
   setMode("design");
   if (!cloud.configured) {
     setSyncStatus("local", "Local mode — edits save in this browser only.");

@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Immersive Experience Design Taxonomy</title>
-  <meta name="description" content="A welcome page for the Immersive Experience Design Taxonomy. Start designing an immersive experience or learn more about the taxonomy." />
+  <title>About — Immersive Experience Design Taxonomy</title>
+  <meta name="description" content="What the Immersive Experience Design Taxonomy is, who it is for, and how designers use it as a map of design possibilities rather than a score or checklist." />
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="about-page">
 
   <!-- ============================================================
        SITE HEADER — brand (left), centered nav, account (right)
@@ -20,9 +20,9 @@
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a href="index.html" class="is-active" aria-current="page">Home</a>
+        <a href="index.html">Home</a>
         <a href="design.html">Design</a>
-        <a href="about.html">About</a>
+        <a href="about.html" class="is-active" aria-current="page">About</a>
       </nav>
 
       <div class="header-actions">
@@ -49,16 +49,47 @@
   </header>
 
   <!-- ============================================================
-       LANDING — a simple welcome and two choices
+       ABOUT — what the taxonomy is and how it is used
        ============================================================ -->
-  <main class="landing-main">
-    <section class="landing-hero">
-      <p class="hero-eyebrow">Immersive Experience Design</p>
-      <h1 class="landing-question">Hi! Would you like to start designing<br />or learn about the site?</h1>
-      <p class="landing-sub">Pick where you'd like to go.</p>
-      <div class="landing-choices">
+  <main class="about-main">
+    <section class="about-hero">
+      <p class="hero-eyebrow">About the taxonomy</p>
+      <h1>The Immersive Experience<br /><span class="gradient-text">Design Taxonomy</span></h1>
+      <p class="hero-sub">
+        A practical framework for turning lessons, stories, exhibitions, trainings, and
+        performances into intentional immersive experiences.
+      </p>
+    </section>
+
+    <section class="intro page-section">
+      <div class="intro-grid">
+        <div class="intro-card">
+          <h3>What it is</h3>
+          <p>A map of ten design dimensions that appear across immersive experiences: interactivity, embodiment, co-participation, story, dynamics, gamification, immersive technology, meta-control, didactic capacity, and data.</p>
+        </div>
+        <div class="intro-card">
+          <h3>Who it is for</h3>
+          <p>Artists, educators, instructional designers, storytellers, researchers, trainers, performers, and immersive experience designers who want to name choices that are often made by instinct.</p>
+        </div>
+        <div class="intro-card">
+          <h3>What it helps solve</h3>
+          <p>It supports brainstorming, concept development, reviewing existing experiences, finding missing design opportunities, teaching immersive design, and refining intentional choices before production begins.</p>
+        </div>
+        <div class="intro-card">
+          <h3>How designers use it</h3>
+          <p>Choose a topic, then explore one element in each dimension. The result is not a score or a checklist; it is a design profile that clarifies what kind of experience you are building and why.</p>
+        </div>
+      </div>
+
+      <ul class="landing-framing">
+        <li><strong>A map, not a checklist.</strong> Each dimension opens a family of design possibilities to consider, not boxes to tick.</li>
+        <li><strong>Not a score.</strong> A higher element is not automatically better; Element 4 is not superior to Element 0.</li>
+        <li><strong>Purpose decides.</strong> The right element in each dimension depends entirely on the purpose of the experience you are designing.</li>
+        <li><strong>Technology is an amplifier.</strong> Immersive technology can deepen presence, but it is not the art itself.</li>
+      </ul>
+
+      <div class="about-cta">
         <a class="btn btn-primary btn-large" href="design.html">Start Designing</a>
-        <a class="btn btn-brand btn-large" href="about.html">Learn More</a>
       </div>
     </section>
   </main>
@@ -148,8 +179,6 @@
     <p id="settings-pw-status" class="sync-status settings-status" role="status" hidden></p>
   </dialog>
 
-  <!-- Landing and About load only the shared account module, never
-       the taxonomy editor or generator. -->
   <script type="module" src="account.js?v=20260719"></script>
 </body>
 </html>

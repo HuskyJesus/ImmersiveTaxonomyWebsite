@@ -9,9 +9,13 @@ A landing page and flexible design workspace for the immersive experience design
 
 ## How the site works
 
-### The landing page
+The site is three separate pages that share one header (branding left, centered navigation, account controls right) and one authentication system:
 
-Visitors arrive on a brief introduction: what the taxonomy is (a **map of design possibilities** — not a checklist, not a score; Element 4 is never automatically "better" than Element 0), who it's for, the problem it solves, and how it works. **Start Designing** scrolls to the workspace; **About the Taxonomy** and the video section offer more depth. The full table never appears before the visitor chooses to design.
+- **`index.html` — landing.** A simple welcome ("Hi! Would you like to start designing or learn about the site?") with two choices: **Start Designing** (to the design workspace) and **Learn More** (to the About page). Account controls are always in the header.
+- **`design.html` — the design workspace.** The taxonomy table, generation, saved experiences, and admin editing.
+- **`about.html` — about.** What the taxonomy is, who it is for, how it is used, and that it is a map of possibilities rather than a score (a higher element is not automatically better; the right choice depends on the experience's purpose). Includes its own **Start Designing** action.
+
+The landing and About pages load only the shared account module (`account.js`), never the taxonomy editor or generator.
 
 ### The design workspace
 
@@ -79,10 +83,12 @@ The header's **Edit Taxonomy** button switches the table into editing: inline na
 
 | File | Purpose |
 |---|---|
-| `index.html` | Landing and about page |
+| `index.html` | Landing page (welcome + two choices) |
+| `about.html` | About the taxonomy |
 | `design.html` | The design workspace, generation, and dialogs |
 | `styles.css` | All styling — theme variables at the top |
-| `script.js` | All logic — workspace, locks, generator, cloud sync, auth, library |
+| `account.js` | Shared authentication + account menu + Account Settings (loaded by every page) |
+| `script.js` | Design-workspace logic — table, locks, generator, cloud taxonomy sync, saved-experience library |
 | `starter-content.js` | Default taxonomy + editable starter descriptions |
 | `ai-provider.js` | AI provider abstraction (OpenAI implemented, local fallback) |
 | `ai-config.js` | AI provider configuration |

@@ -80,23 +80,32 @@ main {
   box-shadow: 0 2px 12px rgba(10, 31, 25, 0.35);
 }
 
+/* Three-column grid: branding left, nav truly centered on the
+   viewport, account controls right. The center column is centered
+   independently of the left/right widths, so a long display name or
+   the Sign In / Sign Up pair never pushes the tabs off-center. */
 .header-inner {
   max-width: 1240px;
   margin: 0 auto;
   padding: 14px 24px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas: "brand nav actions";
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
 }
 
 .brand {
+  grid-area: brand;
+  justify-self: start;
   display: flex;
   align-items: center;
   gap: 10px;
   font-weight: 700;
 }
+
+.site-nav { grid-area: nav; justify-self: center; }
+.header-actions { grid-area: actions; justify-self: end; }
 
 .brand-mark {
   display: inline-grid;
@@ -129,6 +138,14 @@ main {
 }
 
 .site-nav a:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+
+/* Current page */
+.site-nav a.is-active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.site-nav a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 .header-actions {
   display: flex;
@@ -213,33 +230,65 @@ main {
 .account-dropdown button:hover { background: var(--green-100); }
 
 /* ------------------------------------------------------------
-   Landing + introduction + video
+   Landing page — a welcome and two choices
    ------------------------------------------------------------ */
-.landing {
-  max-width: 880px;
+.landing-main {
+  max-width: 820px;
   margin: 0 auto;
-  padding: 88px 24px 56px;
-  min-height: 62vh;
+  padding: 24px;
+  min-height: calc(100vh - 210px);
+  display: grid;
+  place-items: center;
   text-align: center;
-  background: radial-gradient(ellipse 90% 70% at 50% 0%, rgba(27, 87, 65, 0.05), transparent);
 }
 
-.landing h1 {
+.landing-hero {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 56px 40px;
+  animation: rise 0.3s ease both;
+}
+
+.landing-question {
+  margin: 6px 0 10px;
+  font-size: clamp(1.6rem, 4vw, 2.5rem);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+
+.landing-sub {
+  margin: 0 0 28px;
+  color: var(--ink-soft);
+  font-size: 1.02rem;
+}
+
+.landing-choices {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.landing-choices .btn { min-width: 200px; }
+
+/* ------------------------------------------------------------
+   About page — informational hero + cards
+   ------------------------------------------------------------ */
+.about-main { max-width: 1180px; margin: 0 auto; padding: 0 24px 16px; }
+
+.about-hero { text-align: center; padding: 52px 24px 8px; }
+
+.about-hero h1 {
   margin: 0 0 14px;
   font-size: clamp(2rem, 5vw, 3rem);
   line-height: 1.12;
   letter-spacing: -0.02em;
 }
 
-.landing-actions {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 26px 0 34px;
-}
-
-.landing-actions a { text-decoration: none; display: inline-block; }
+.about-cta { display: flex; justify-content: center; margin: 26px 0 12px; }
 
 .landing-framing {
   list-style: none;
@@ -262,20 +311,6 @@ main {
 }
 
 .landing-framing strong { color: var(--ink); }
-
-.landing-attribution {
-  margin: 30px auto 0;
-  max-width: 640px;
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-}
-
-.section-title {
-  text-align: center;
-  margin: 0 0 20px;
-  font-size: 1.5rem;
-  letter-spacing: -0.01em;
-}
 
 .hero-eyebrow {
   margin: 0 0 10px;
@@ -496,6 +531,14 @@ main {
 }
 
 .btn:active { transform: translateY(0) scale(0.97); }
+
+/* Anchors styled as buttons (landing/about calls to action) */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
 
 .btn:focus-visible { outline: 2px solid var(--grad-a); outline-offset: 2px; }
 
@@ -1288,19 +1331,42 @@ td:hover .cell-info-btn, .cell-info-btn:focus-visible { opacity: 1; }
 /* ------------------------------------------------------------
    Responsiveness
    ------------------------------------------------------------ */
+/* Below this width, show only the account avatar (not the display
+   name) so a long name can never widen the right column enough to
+   push the centered navigation off-center. */
+@media (max-width: 900px) {
+  .account-name { display: none; }
+}
+
 @media (max-width: 720px) {
-  .header-inner { justify-content: center; }
-  .hero { padding-top: 40px; }
   .topic-row { flex-direction: column; align-items: stretch; }
   th, td { padding: 9px 10px; }
-  .landing { padding-top: 52px; min-height: auto; }
 
-  .account-name { display: none; }
   .account-btn { padding: 8px 10px; }
-  .site-nav a { padding: 8px 10px; font-size: 0.84rem; }
+  .site-nav a { padding: 8px 12px; font-size: 0.86rem; }
   thead th { position: static; }   /* the wrapped header is taller here */
   .library-controls { flex-direction: column; align-items: stretch; }
   .lib-actions .btn { flex: 1; }
   .idea-actions .btn { flex: 1; }
   .generate-bar .btn { width: 100%; min-width: 0; }
+}
+
+/* Narrow screens: brand + account on the top row, centered nav on
+   its own row below, so the tabs never overlap the logo or account. */
+@media (max-width: 600px) {
+  .header-inner {
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      "brand actions"
+      "nav nav";
+    justify-content: space-between;
+    row-gap: 8px;
+  }
+  .site-nav { justify-self: center; }
+}
+
+@media (max-width: 480px) {
+  .landing-choices { flex-direction: column; align-items: stretch; }
+  .landing-choices .btn { width: 100%; }
+  .landing-hero { padding: 40px 22px; }
 }
