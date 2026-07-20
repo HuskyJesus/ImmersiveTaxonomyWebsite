@@ -74,6 +74,24 @@ Signed-in users save generated briefs to their private library: search, sort, fa
 
 The header's **Edit Taxonomy** button switches the table into editing: inline name edits, per-element and per-category description editors with Save/Cancel, a **Compare / Restore Default** button inside the editor, add/delete dimensions and element rows (with confirmation), **Restore Manuscript Defaults**, cloud autosave with visible status, **Save Now**, and JSON backup tools. Edit controls never appear in the normal workspace.
 
+## Data model: migration vs. hydration
+
+All taxonomy data logic lives in [`taxonomy-model.js`](taxonomy-model.js). Two version stamps travel with the data:
+
+- **`schemaVersion` (currently 3)** — the structural shape (columns and cells as objects with stable ids and description fields).
+- **`contentMigrationVersion` (currently 1)** — records that the one-time historical-content migration (canonical renames, canonical ordering) has been applied. Both are written to Firestore (`taxonomy/current`) and the localStorage cache on every save, so a migrated document never migrates again.
+
+Two strictly separated load paths:
+
+- **Legacy migration** runs only for genuinely old data, detected by explicit structure: v1 (plain string columns/cells) or v2 (`schemaVersion: 2`, string cells) — never because a visible name matches an old label. It upgrades the structure, applies the historical `LEGACY_*` name maps (e.g. Motivation → Gamification), restores canonical column order, refreshes never-customized records from the shipped defaults, mints stable ids, and stamps both versions. It is idempotent, and after the first save the stamped result loads through hydration only.
+- **Hydration** runs on every load of current (v3) data — Firestore, localStorage, and JSON import. It only repairs shape: fills fields that are completely absent (so old-but-current documents gain newly added fields), mints missing ids, and coerces metadata types. It never renames anything, never applies legacy aliases, never reorders columns, and never replaces a record with a default — current data is authoritative exactly as stored, with or without `hasCustomEdits`.
+
+**Administrator edits:** any edit (inline rename, editor dialog, description change) sets `hasCustomEdits` on that record, keeps its stable id, and saves the exact visible text. Identity is always the stable `id` — saved experiences, locking, and Compare/Restore Default resolve by id, so renaming a category never breaks references. **Restore Default** (per-record in the editor, or Restore Manuscript Defaults for everything) is the only routine way custom content returns to canonical manuscript names — loading never does that.
+
+**Imports:** current-schema (v3) JSON is preserved exactly (hydration only); genuine v1/v2 JSON goes through the one-time migration and, once saved, never migrates again.
+
+**Tests:** open [`test/tests.html`](test/tests.html) from any static server at the repo root (e.g. `python3 -m http.server`, then `/test/tests.html`). The suite covers name preservation for every legacy alias, round trips through the Firestore and localStorage shapes, stable-id preservation across renames, v1/v2 migration, idempotency, and ordering.
+
 ## Testing locally and in the cloud
 
 - **Local:** serve the folder with any static server (e.g. `python3 -m http.server`) and open it. With `firebase-config.js` placeholders the site runs in local-only mode (edits stay in the browser). With the real config it loads the published cloud taxonomy; sign in to test accounts and saving.
@@ -89,6 +107,8 @@ The header's **Edit Taxonomy** button switches the table into editing: inline na
 | `styles.css` | All styling — theme variables at the top |
 | `account.js` | Shared authentication + account menu + Account Settings (loaded by every page) |
 | `script.js` | Design-workspace logic — table, locks, generator, cloud taxonomy sync, saved-experience library |
+| `taxonomy-model.js` | Pure data model — validation, current-data hydration, one-time legacy migration, cloud (de)serialization |
+| `test/tests.html` | Browser test runner for the data model (`test/taxonomy-model.tests.js`) |
 | `starter-content.js` | Default taxonomy + editable starter descriptions |
 | `ai-provider.js` | AI provider abstraction (OpenAI implemented, local fallback) |
 | `ai-config.js` | AI provider configuration |

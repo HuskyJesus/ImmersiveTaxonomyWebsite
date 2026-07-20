@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Taxonomy Model Tests</title>
+  <style>
+    body { font-family: ui-monospace, monospace; margin: 2rem; }
+    .ok { color: #16794c; } .fail { color: #b3261e; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Taxonomy model test suite</h1>
+  <p id="summary">Running…</p>
+  <ul id="list"></ul>
+  <script type="module">
+    import { report } from "./taxonomy-model.tests.js";
+    const { summary, results } = report();
+    document.getElementById("summary").textContent = summary;
+    const list = document.getElementById("list");
+    results.forEach((r) => {
+      const li = document.createElement("li");
+      li.className = r.ok ? "ok" : "fail";
+      li.textContent = (r.ok ? "PASS " : "FAIL ") + r.name + (r.error ? " — " + r.error : "");
+      list.append(li);
+    });
+  </script>
+</body>
+</html>

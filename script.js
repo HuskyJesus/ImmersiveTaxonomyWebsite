@@ -4,7 +4,8 @@
    How this file is organized:
      1. Imports, constants, admin allowlist
      2. App state
-     3. Data model helpers + migration (v1/v2 → v3)
+     3. Data model — in taxonomy-model.js (hydration of current
+        data vs. one-time migration of genuine v1/v2 data)
      4. Local persistence (localStorage cache)
      5. Cloud sync (Firestore, optional)
      6. Authentication + user accounts
@@ -54,8 +55,12 @@
    ============================================================ */
 
 import { account, accountsReady, onAuthState, onBeforeSignOut, registerLibraryOpener, openAuthModal } from "./account.js?v=20260716-ixd2";
-import { DEFAULT_COLUMNS, VALUE_STARTERS, buildDefaultTaxonomy } from "./starter-content.js?v=20260716-ixd2";
+import { buildDefaultTaxonomy } from "./starter-content.js?v=20260716-ixd2";
 import { aiAvailable, generateWithAI } from "./ai-provider.js?v=20260716-ixd2";
+import {
+  normalizeTaxonomy, hydrateTaxonomy, serializeTaxonomy, deserializeCloudTaxonomy,
+  makeCell, makeColumnId, blankColumnExtras
+} from "./taxonomy-model.js?v=20260720-migration1";
 
 /* ------------------------------------------------------------
    1. CONSTANTS + ADMIN ALLOWLIST
@@ -63,7 +68,6 @@ import { aiAvailable, generateWithAI } from "./ai-provider.js?v=20260716-ixd2";
 const STORAGE_KEY = "immersive-taxonomy-v3";
 const LEGACY_KEYS = ["immersive-taxonomy-v2", "immersive-taxonomy-v1"];
 const CLOUD_DOC_PATH = ["taxonomy", "current"];
-const SCHEMA_VERSION = 3;
 const EXPERIENCE_SCHEMA_VERSION = 2;   // v2 = the design-brief report shape
 
 /* To show the walkthrough video, paste a YouTube or Loom EMBED
@@ -100,25 +104,6 @@ const ICON_LOCK_OPEN =
 const ICON_INFO =
   '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM7.25 6.75h1.5v4.5h-1.5v-4.5ZM8 5.75a.9.9 0 1 1 0-1.8.9.9 0 0 1 0 1.8Z"/></svg>';
 
-/* The manuscript-content fields carried by columns and elements */
-const COLUMN_EXTRA_FIELDS = [
-  ["subtitle", "Chapter framing subtitle"],
-  ["designQuestion", "Central design question"],
-  ["whyItMatters", "Why it matters"],
-  ["useCases", "Use cases"],
-  ["cautions", "Cautions"],
-  ["progression", "Five-element progression"],
-  ["source", "Source chapter"]
-];
-const VALUE_EXTRA_FIELDS = [
-  ["participantRole", "Participant role"],
-  ["designerResponsibility", "Designer responsibility"],
-  ["useCases", "Appropriate use cases"],
-  ["cautions", "Cautions"],
-  ["source", "Source chapter and section"],
-  ["keywords", "Search keywords"]
-];
-
 const COLUMN_EDITOR_FIELDS = [
   { key: "subtitle", id: "edit-cat-subtitle", fieldId: "edit-subtitle-field" },
   { key: "shortDescription", id: "edit-cat-short" },
@@ -150,80 +135,6 @@ const ALL_EDITOR_FIELD_IDS = [
   "edit-example-field"
 ];
 
-const LEGACY_COLUMN_NAMES = {
-  Motivation: "Gamification",
-  Tech: "Immersive Technology",
-  Learning: "Didactic Capacity"
-};
-
-const LEGACY_VALUE_NAMES = {
-  "Single Person": "Single Player",
-  Predetermined: "Pre-Determined",
-  Observer: "Watcher",
-  "First Person POV": "First-Person POV",
-  "Movement Control": "Movement",
-  "Human to Human": "Human-to-Human Interaction",
-  "One on One": "One-on-One",
-  MMO: "MMO (Massively Multiplayer Online)",
-  "Pre-created": "Pre-Created Story",
-  "Choose your own": "Choose Your Own",
-  "Adaptive Story": "Interactive Story",
-  "Conversational Reality": "Convo-Reality",
-  "Adjustible POV": "Adjustable POV",
-  "Basic Mechanics": "Instruction",
-  Challenge: "External Process",
-  AR: "Augmented Reality (AR)",
-  VR: "Virtual Reality (VR)",
-  XR: "XR (Extended/Cross Reality)",
-  "2D": "360° Media",
-  Journey: "The Chosen Path",
-  Character: "The Mirror Self",
-  "World Editor": "The World Builder",
-  "World Builder": "The World Master",
-  Sythensis: "Synthesis",
-  "In-session": "In-Game",
-  Personalized: "Personalization",
-  Biometric: "Biometrics"
-};
-
-const LEGACY_VALUE_NAMES_BY_COLUMN = {
-  motivation: {
-    None: "Ungamified"
-  },
-  story: {
-    None: "No Story"
-  },
-  "meta-control": {
-    None: "The Passive Watcher",
-    Journey: "The Chosen Path",
-    Character: "The Mirror Self"
-  },
-  tech: {
-    none: "None",
-    AR: "Augmented Reality (AR)",
-    VR: "Virtual Reality (VR)",
-    XR: "XR (Extended/Cross Reality)",
-    "2D": "360° Media"
-  }
-};
-
-function reorderKnownDefaultColumns(data) {
-  const defaults = buildDefaultTaxonomy();
-  const order = defaults.columns.map((c) => c.id);
-  const indexById = Object.fromEntries(data.columns.map((c, i) => [c.id, i]));
-  if (!order.every((id) => indexById[id] !== undefined)) return data;
-
-  const remaining = data.columns
-    .map((c, i) => ({ id: c.id, index: i }))
-    .filter((entry) => !order.includes(entry.id))
-    .map((entry) => entry.index);
-  const newOrder = [...order.map((id) => indexById[id]), ...remaining];
-
-  data.columns = newOrder.map((oldIndex) => data.columns[oldIndex]);
-  data.rows = data.rows.map((row) => newOrder.map((oldIndex) => row[oldIndex]));
-  return data;
-}
-
 /* ------------------------------------------------------------
    2. APP STATE
    ------------------------------------------------------------ */
@@ -253,175 +164,6 @@ const cloud = {
   saving: false,
   savePending: false
 };
-
-/* ------------------------------------------------------------
-   3. DATA MODEL HELPERS + MIGRATION
-   ------------------------------------------------------------ */
-function slugify(text) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-
-function makeColumnId(name) {
-  return `${slugify(name) || "column"}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function makeValueId(text) {
-  return `${slugify(text) || "value"}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function blankColumnExtras() {
-  return {
-    ...Object.fromEntries(COLUMN_EXTRA_FIELDS.map(([k]) => [k, ""])),
-    sourceType: "custom",
-    hasCustomEdits: true,
-    lastEditedAt: "",
-    lastEditedBy: ""
-  };
-}
-
-function blankValueExtras() {
-  return {
-    ...Object.fromEntries(VALUE_EXTRA_FIELDS.map(([k]) => [k, ""])),
-    sourceType: "custom",
-    hasCustomEdits: true,
-    lastEditedAt: "",
-    lastEditedBy: ""
-  };
-}
-
-function makeCell(text = "") {
-  return { id: makeValueId(text), text, shortDescription: "", detailedDescription: "", example: "", ...blankValueExtras() };
-}
-
-function starterFor(columnId, text) {
-  return (VALUE_STARTERS[columnId] || {})[text] || { short: "", detailed: "", example: "" };
-}
-
-function upgradeCell(text, columnId) {
-  const starter = starterFor(columnId, text);
-  return {
-    id: makeValueId(text),
-    text,
-    shortDescription: starter.short,
-    detailedDescription: starter.detailed,
-    example: starter.example,
-    ...blankValueExtras()
-  };
-}
-
-function isValidV3(data) {
-  return (
-    data && data.schemaVersion === 3 &&
-    Array.isArray(data.columns) && data.columns.length > 0 &&
-    data.columns.every((c) => c && typeof c.id === "string" && typeof c.name === "string") &&
-    Array.isArray(data.rows) &&
-    data.rows.every((row) => Array.isArray(row) && row.length === data.columns.length &&
-      row.every((cell) => cell && typeof cell.id === "string" && typeof cell.text === "string"))
-  );
-}
-
-function isValidV2(data) {
-  return (
-    data && data.schemaVersion === 2 &&
-    Array.isArray(data.columns) && data.columns.length > 0 &&
-    data.columns.every((c) => c && typeof c.id === "string" && typeof c.name === "string") &&
-    Array.isArray(data.rows) &&
-    data.rows.every((row) => Array.isArray(row) && row.length === data.columns.length &&
-      row.every((cell) => typeof cell === "string"))
-  );
-}
-
-function isValidV1(data) {
-  return (
-    data && Array.isArray(data.columns) && data.columns.length > 0 &&
-    data.columns.every((c) => typeof c === "string") &&
-    Array.isArray(data.rows) &&
-    data.rows.every((row) => Array.isArray(row) && row.length === data.columns.length &&
-      row.every((cell) => typeof cell === "string"))
-  );
-}
-
-/* Fills in optional fields that older data might lack — this is
-   how pre-existing cloud/local data gains the new manuscript
-   fields without losing anything. */
-function tidyV3(data) {
-  data = reorderKnownDefaultColumns(data);
-  const defaults = buildDefaultTaxonomy();
-  const defaultsByColumnId = Object.fromEntries(defaults.columns.map((c, i) => [c.id, { col: c, index: i }]));
-
-  data.columns.forEach((c) => {
-    c.name = LEGACY_COLUMN_NAMES[c.name] || c.name;
-    const def = defaultsByColumnId[c.id]?.col;
-    // Refresh from the shipped defaults ONLY when the record has
-    // never been customized — hasCustomEdits is the sole authority.
-    // (Checking sourceType here used to wipe saved admin edits on
-    // every load, because edited default records keep the
-    // "manuscript-derived" sourceType.)
-    if (def && !c.hasCustomEdits) {
-      Object.assign(c, structuredClone(def), { id: c.id });
-    }
-    c.shortDescription = c.shortDescription || "";
-    c.detailedDescription = c.detailedDescription || "";
-    c.example = c.example || "";
-    COLUMN_EXTRA_FIELDS.forEach(([k]) => { c[k] = c[k] || ""; });
-    c.sourceType = c.sourceType || "custom";
-    c.hasCustomEdits = !!c.hasCustomEdits;
-    c.lastEditedAt = c.lastEditedAt || "";
-    c.lastEditedBy = c.lastEditedBy || "";
-  });
-  data.rows.forEach((row, rowIndex) =>
-    row.forEach((cell, cIndex) => {
-      const colId = data.columns[cIndex]?.id;
-      cell.text = LEGACY_VALUE_NAMES_BY_COLUMN[colId]?.[cell.text] || LEGACY_VALUE_NAMES[cell.text] || cell.text;
-      const defMeta = defaultsByColumnId[data.columns[cIndex]?.id];
-      const defCell = defMeta && rowIndex < defaults.rows.length ? defaults.rows[rowIndex][defMeta.index] : null;
-      // Same rule as columns: never overwrite a customized element.
-      if (defCell && !cell.hasCustomEdits) {
-        Object.assign(cell, structuredClone(defCell), { id: cell.id });
-      }
-      cell.shortDescription = cell.shortDescription || "";
-      cell.detailedDescription = cell.detailedDescription || "";
-      cell.example = cell.example || "";
-      VALUE_EXTRA_FIELDS.forEach(([k]) => { cell[k] = cell[k] || ""; });
-      cell.sourceType = cell.sourceType || "custom";
-      cell.hasCustomEdits = !!cell.hasCustomEdits;
-      cell.lastEditedAt = cell.lastEditedAt || "";
-      cell.lastEditedBy = cell.lastEditedBy || "";
-    })
-  );
-  return data;
-}
-
-/* MIGRATION: accepts v3, v2, or v1 shapes and returns v3.
-   Existing ids are kept; custom text is never overwritten. */
-function normalizeTaxonomy(data) {
-  if (isValidV3(data)) return tidyV3(data);
-
-  if (isValidV2(data)) {
-    return tidyV3({
-      schemaVersion: 3,
-      columns: data.columns.map((c) => ({ ...c })),
-      rows: data.rows.map((row) => row.map((text, c) => upgradeCell(text, data.columns[c].id)))
-    });
-  }
-
-  if (isValidV1(data)) {
-    const byName = Object.fromEntries(DEFAULT_COLUMNS.map((c) => [c.name, c]));
-    const columns = data.columns.map((name) => {
-      const preset = byName[name];
-      return preset
-        ? structuredClone(preset)
-        : { id: makeColumnId(name), name, shortDescription: "", detailedDescription: "", example: "" };
-    });
-    return tidyV3({
-      schemaVersion: 3,
-      columns,
-      rows: data.rows.map((row) => row.map((text, c) => upgradeCell(text, columns[c].id)))
-    });
-  }
-
-  return null;
-}
 
 /* ------------------------------------------------------------
    4. LOCAL PERSISTENCE
@@ -465,39 +207,15 @@ function saveLocal() {
 /* ------------------------------------------------------------
    5. CLOUD SYNC (Cloud Firestore)
    ------------------------------------------------------------ */
+/* Serialization/deserialization live in taxonomy-model.js. The
+   cloud document is always current-schema data — loading it runs
+   hydration only, never legacy-name migration. */
 function serializeForCloud() {
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    columns: taxonomy.columns.map((col, c) => ({
-      ...col,                                              // includes manuscript fields
-      values: taxonomy.rows.map((row) => ({ ...row[c] }))
-    })),
-    rowCount: taxonomy.rows.length
-  };
+  return serializeTaxonomy(taxonomy);
 }
 
 function deserializeFromCloud(data) {
-  if (!data || !Array.isArray(data.columns) || data.columns.length === 0) return null;
-  const rowCount = data.rowCount ?? Math.max(...data.columns.map((c) => (c.values || []).length), 0);
-  const columns = data.columns.map((c) => {
-    const { values, ...rest } = c;
-    return {
-      id: rest.id || makeColumnId(rest.name || "column"),
-      name: rest.name || "Untitled",
-      ...rest
-    };
-  });
-  const rows = Array.from({ length: rowCount }, (_, r) =>
-    data.columns.map((c, ci) => {
-      const v = (c.values || [])[r];
-      if (v && typeof v === "object") {
-        return { ...v, id: v.id || makeValueId(v.text || ""), text: v.text || "" };
-      }
-      return upgradeCell(typeof v === "string" ? v : "", columns[ci].id);
-    })
-  );
-  const tax = { schemaVersion: 3, columns, rows };
-  return isValidV3(tax) ? tidyV3(tax) : null;
+  return deserializeCloudTaxonomy(data);
 }
 
 async function initCloud() {
@@ -1514,7 +1232,7 @@ function importJSON(file) {
 
 function resetToDefault() {
   if (!confirm("Restore the manuscript-derived default taxonomy? This replaces the current framework (descriptions included).")) return;
-  taxonomy = buildDefaultTaxonomy();
+  taxonomy = hydrateTaxonomy(buildDefaultTaxonomy());
   afterStructureChange();
 }
 
